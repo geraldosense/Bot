@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 240" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="400" y2="240" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#14532D"/>
+      <stop offset="1" stop-color="#052E16"/>
+    </linearGradient>
+    <radialGradient id="lights" cx="50%" cy="0%" r="80%">
+      <stop stop-color="#4ADE80" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#052E16" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="400" height="240" rx="20" fill="url(#bg)"/>
+  <rect width="400" height="240" rx="20" fill="url(#lights)"/>
+  <ellipse cx="200" cy="200" rx="160" ry="40" fill="#166534" opacity="0.8"/>
+  <rect x="60" y="150" width="280" height="4" fill="#fff" opacity="0.35"/>
+  <circle cx="200" cy="150" r="36" stroke="#fff" stroke-width="3" fill="none" opacity="0.5"/>
+  <circle cx="200" cy="118" r="34" fill="#fff"/>
+  <path d="M200 88 L215 108 L200 128 L185 108 Z" fill="#111"/>
+  <path d="M200 88 L220 98 L215 118 L200 108 Z" fill="#111" opacity="0.7"/>
+  <path d="M200 88 L180 98 L185 118 L200 108 Z" fill="#111" opacity="0.7"/>
+  <text x="200" y="210" text-anchor="middle" fill="#BBF7D0" font-family="Arial Black, sans-serif" font-size="20" font-weight="900">FOOTBALL STUDIO</text>
+</svg>
