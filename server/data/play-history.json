@@ -2806,13 +2806,93 @@
               "gale": 0,
               "maxGales": 0,
               "at": "2026-08-19T00:07:46.722748+00:00"
+            },
+            {
+              "id": "4d361111-5e0a-477d-a338-1e6a61e33f12",
+              "result": "green",
+              "bet": null,
+              "gale": 0,
+              "maxGales": 0,
+              "at": "2026-08-19T00:11:33.143515+00:00"
+            },
+            {
+              "id": "faaeed3f-65de-413d-b229-ce009510c30b",
+              "result": "green",
+              "bet": null,
+              "gale": 0,
+              "maxGales": 0,
+              "at": "2026-08-19T00:13:44.489891+00:00"
+            },
+            {
+              "id": "78444bbd-ad32-4317-a667-3f60ae2eaf66",
+              "result": "green",
+              "bet": null,
+              "gale": 0,
+              "maxGales": 0,
+              "at": "2026-08-19T00:15:23.813622+00:00"
+            },
+            {
+              "id": "4a04401e-d8cb-41f5-a0a6-07eb318e93ab",
+              "result": "green",
+              "bet": null,
+              "gale": 0,
+              "maxGales": 0,
+              "at": "2026-08-19T00:16:28.545712+00:00"
+            },
+            {
+              "id": "47429c12-3001-4399-908c-1562be6c459b",
+              "result": "green",
+              "bet": null,
+              "gale": 0,
+              "maxGales": 0,
+              "at": "2026-08-19T00:26:05.581632+00:00"
+            },
+            {
+              "id": "2767b67b-95d0-46b7-9792-01e9d759fdd1",
+              "result": "green",
+              "bet": null,
+              "gale": 0,
+              "maxGales": 0,
+              "at": "2026-08-19T00:28:44.986459+00:00"
+            },
+            {
+              "id": "5cbfcb71-864e-4dc7-a1cf-769c182c1095",
+              "result": "green",
+              "bet": null,
+              "gale": 0,
+              "maxGales": 0,
+              "at": "2026-08-19T00:30:51.915951+00:00"
+            },
+            {
+              "id": "333aa0b7-0c9f-4362-80f4-b9426ebb76fe",
+              "result": "green",
+              "bet": null,
+              "gale": 0,
+              "maxGales": 0,
+              "at": "2026-08-19T00:31:55.721784+00:00"
+            },
+            {
+              "id": "c4b1ac00-4df8-485f-af2d-2c227467cdab",
+              "result": "green",
+              "bet": null,
+              "gale": 0,
+              "maxGales": 0,
+              "at": "2026-08-19T00:32:57.822168+00:00"
+            },
+            {
+              "id": "32d75576-bda5-45f3-85a4-db97b29e1679",
+              "result": "green",
+              "bet": null,
+              "gale": 0,
+              "maxGales": 0,
+              "at": "2026-08-19T00:35:03.109099+00:00"
             }
           ],
           "casinoTotals": {
-            "greens": 331,
+            "greens": 341,
             "reds": 13,
-            "winRate": 96.22,
-            "syncedAt": "2026-08-19T00:07:47.322654+00:00"
+            "winRate": 96.33,
+            "syncedAt": "2026-08-19T00:35:03.92724+00:00"
           }
         }
       }

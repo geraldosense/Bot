@@ -8,6 +8,8 @@ import BottomNav from '../components/BottomNav';
 import SenseBotLogo from '../components/SenseBotLogo';
 import GameCard from '../components/GameCard';
 import DailyScoreboardPanel from '../components/DailyScoreboardPanel';
+import VipLockedPanel, { VipStatusBanner } from '../components/VipLockedPanel';
+import { useAuth } from '../context/AuthContext';
 import { normalizeScoreboard, formatWinRate } from '../utils/scoreboard';
 
 const GAMES = [
@@ -62,6 +64,7 @@ const PLACEHOLDER_SCORE = normalizeScoreboard();
 
 export default function Dashboard() {
   const { connected, snapshot } = useWebSocket();
+  const { user, isVip } = useAuth();
   const [selectedGame, setSelectedGame] = React.useState(GAMES[0]);
   const [category, setCategory] = React.useState('all');
   const [tab, setTab] = React.useState('sinais');
@@ -69,8 +72,8 @@ export default function Dashboard() {
   const isLiveGame = selectedGame.type === 'bacbo' && !selectedGame.disabled;
 
   const displayScoreboard = useMemo(
-    () => (isLiveGame ? snapshot.scoreboard : PLACEHOLDER_SCORE),
-    [isLiveGame, snapshot.scoreboard],
+    () => (isLiveGame && isVip ? snapshot.scoreboard : PLACEHOLDER_SCORE),
+    [isLiveGame, isVip, snapshot.scoreboard],
   );
 
   const maxGales = snapshot.rawSignal?.gales ?? snapshot.signal?.gales ?? 2;
@@ -96,26 +99,27 @@ export default function Dashboard() {
           <div className="flex items-center gap-3">
             <div
               className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
-                connected
+                isVip && connected
                   ? 'bg-green-500/20 text-green-300 border border-green-500/40'
-                  : 'bg-red-500/20 text-red-300 border border-red-500/40'
+                  : 'bg-zinc-700/40 text-zinc-400 border border-zinc-600/40'
               }`}
             >
-              {connected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-              {connected ? 'Online' : 'Offline'}
+              {isVip && connected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+              {isVip && connected ? 'Online' : isVip ? 'Offline' : 'Sem VIP'}
             </div>
           </div>
         </div>
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-4 space-y-4">
-        {/* Placar diário — estilo moneytix, histórico do robô */}
+        {!isVip && <VipStatusBanner user={user} />}
+
         <DailyScoreboardPanel
           scoreboard={displayScoreboard}
           gameName={selectedGame.name}
-          live={isLiveGame && connected && snapshot.casinoConnected}
+          live={isLiveGame && isVip && connected && snapshot.casinoConnected}
           maxGales={maxGales}
-          disabled={!isLiveGame}
+          disabled={!isLiveGame || !isVip}
         />
 
         {/* Game selector */}
@@ -171,15 +175,11 @@ export default function Dashboard() {
         </div>
 
         {/* Tab Sinais — só histórico + botão para o robô completo */}
-        {tab === 'sinais' && isLiveGame && (
+        {tab === 'sinais' && isLiveGame && !isVip && <VipLockedPanel />}
+
+        {tab === 'sinais' && isLiveGame && isVip && (
           <div className="space-y-4">
             <SignalHistory history={snapshot.history} />
-
-            {!snapshot.history?.length && (
-              <p className="text-center text-zinc-500 text-xs py-4">
-                A aguardar resultados ao vivo…
-              </p>
-            )}
 
             <Link
               to="/BacBo"
@@ -206,7 +206,9 @@ export default function Dashboard() {
           </div>
         )}
 
-        {tab === 'catalogador' && isLiveGame && (
+        {tab === 'catalogador' && isLiveGame && !isVip && <VipLockedPanel title="Catalogador ao vivo" />}
+
+        {tab === 'catalogador' && isLiveGame && isVip && (
           <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
             <HistoryGrid rounds={snapshot.rounds} />
           </div>
@@ -218,7 +220,9 @@ export default function Dashboard() {
           </div>
         )}
 
-        {tab === 'historico' && isLiveGame && (
+        {tab === 'historico' && isLiveGame && !isVip && <VipLockedPanel title="Histórico de sinais" />}
+
+        {tab === 'historico' && isLiveGame && isVip && (
           <div className="space-y-4">
             <SignalHistory history={snapshot.history} title="HISTÓRICO COMPLETO" limit={50} />
             <Link

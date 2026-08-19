@@ -16,7 +16,7 @@ export const ROLES = {
 };
 
 const DEFAULT_PERMISSIONS = {
-  can_promote_vip: false,
+  can_request_vip: false,
   can_view_active_users: false,
   can_manage_admins: false,
 };
@@ -59,7 +59,7 @@ export async function seedSuperAdmin() {
     passwordHash: await bcrypt.hash(password, 10),
     role: ROLES.SUPER_ADMIN,
     permissions: {
-      can_promote_vip: true,
+      can_request_vip: true,
       can_view_active_users: true,
       can_manage_admins: true,
     },
@@ -104,6 +104,9 @@ export async function createUser({ email, password, name }) {
     permissions: { ...DEFAULT_PERMISSIONS },
     vipApprovedAt: null,
     vipApprovedBy: null,
+    vipRequest: null,
+    lastLoginAt: null,
+    lastSeenAt: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -111,6 +114,41 @@ export async function createUser({ email, password, name }) {
   store.users.push(user);
   writeStore(store);
   return sanitizeUser(user);
+}
+
+export function recordLogin(userId) {
+  const store = readStore();
+  const idx = store.users.findIndex((u) => u.id === userId);
+  if (idx === -1) return null;
+  const now = new Date().toISOString();
+  store.users[idx].lastLoginAt = now;
+  store.users[idx].lastSeenAt = now;
+  store.users[idx].updatedAt = now;
+  writeStore(store);
+  return sanitizeUser(store.users[idx]);
+}
+
+export function touchLastSeen(userId) {
+  const store = readStore();
+  const idx = store.users.findIndex((u) => u.id === userId);
+  if (idx === -1) return null;
+  const now = new Date().toISOString();
+  store.users[idx].lastSeenAt = now;
+  store.users[idx].updatedAt = now;
+  writeStore(store);
+  return sanitizeUser(store.users[idx]);
+}
+
+export function getAccountStats() {
+  const users = listUsers();
+  const registered = users.filter((u) => u.role !== ROLES.SUPER_ADMIN);
+  return {
+    total: registered.length,
+    members: registered.filter((u) => u.role === ROLES.MEMBER).length,
+    vip: registered.filter((u) => u.role === ROLES.VIP).length,
+    admins: registered.filter((u) => u.role === ROLES.ADMIN).length,
+    vipRequests: registered.filter((u) => u.vipRequest?.status === 'pending').length,
+  };
 }
 
 export async function verifyPassword(user, password) {
@@ -125,6 +163,7 @@ export function approveVip(userId, adminId) {
   store.users[idx].role = ROLES.VIP;
   store.users[idx].vipApprovedAt = new Date().toISOString();
   store.users[idx].vipApprovedBy = adminId;
+  store.users[idx].vipRequest = null;
   store.users[idx].updatedAt = new Date().toISOString();
   writeStore(store);
   return sanitizeUser(store.users[idx]);
@@ -141,6 +180,7 @@ export function revokeVip(userId) {
   store.users[idx].role = ROLES.MEMBER;
   store.users[idx].vipApprovedAt = null;
   store.users[idx].vipApprovedBy = null;
+  store.users[idx].vipRequest = null;
   store.users[idx].updatedAt = new Date().toISOString();
   writeStore(store);
   return sanitizeUser(store.users[idx]);
@@ -155,7 +195,7 @@ export function promoteToAdmin(userId, permissions, superAdminId) {
   store.users[idx].permissions = {
     ...DEFAULT_PERMISSIONS,
     ...permissions,
-    can_promote_vip: false,
+    can_request_vip: true,
     can_manage_admins: false,
   };
   store.users[idx].vipApprovedAt = store.users[idx].vipApprovedAt || new Date().toISOString();
@@ -176,7 +216,6 @@ export function updateAdminPermissions(userId, permissions) {
   store.users[idx].permissions = {
     ...store.users[idx].permissions,
     ...permissions,
-    can_promote_vip: false,
     can_manage_admins: false,
   };
   store.users[idx].updatedAt = new Date().toISOString();
@@ -184,10 +223,57 @@ export function updateAdminPermissions(userId, permissions) {
   return sanitizeUser(store.users[idx]);
 }
 
+export function requestVipPromotion(userId, adminId) {
+  const store = readStore();
+  const idx = store.users.findIndex((u) => u.id === userId);
+  if (idx === -1) throw new Error('Utilizador não encontrado');
+
+  const user = store.users[idx];
+  if (user.role !== ROLES.MEMBER) {
+    throw new Error('Só membros sem VIP podem ser submetidos para aprovação');
+  }
+
+  if (user.vipRequest?.status === 'pending') {
+    throw new Error('Já existe um pedido VIP pendente para este utilizador');
+  }
+
+  store.users[idx].vipRequest = {
+    status: 'pending',
+    requestedBy: adminId,
+    requestedAt: new Date().toISOString(),
+  };
+  store.users[idx].updatedAt = new Date().toISOString();
+  writeStore(store);
+  return sanitizeUser(store.users[idx]);
+}
+
+export function rejectVipRequest(userId) {
+  const store = readStore();
+  const idx = store.users.findIndex((u) => u.id === userId);
+  if (idx === -1) throw new Error('Utilizador não encontrado');
+
+  store.users[idx].vipRequest = null;
+  store.users[idx].updatedAt = new Date().toISOString();
+  writeStore(store);
+  return sanitizeUser(store.users[idx]);
+}
+
+export function listVipRequests() {
+  return readStore()
+    .users.filter((u) => u.role === ROLES.MEMBER && u.vipRequest?.status === 'pending')
+    .map((u) => {
+      const requester = findById(u.vipRequest.requestedBy);
+      return {
+        ...sanitizeUser(u),
+        requestedByName: requester?.name || 'Admin',
+        requestedByEmail: requester?.email || '',
+      };
+    });
+}
+
 export function hasPermission(user, permission) {
   if (!user) return false;
   if (user.role === ROLES.SUPER_ADMIN) return true;
-  if (permission === 'can_promote_vip') return false;
   if (user.role === ROLES.ADMIN) return !!user.permissions?.[permission];
   return false;
 }

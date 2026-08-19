@@ -10,7 +10,7 @@ export default function Auth() {
   const initialTab = location.pathname === '/register' ? 'register' : 'login';
   const [tab, setTab] = useState(initialTab);
 
-  const { login, register, user, isVip, loading: authLoading } = useAuth();
+  const { login, register, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   const [name, setName] = useState('');
@@ -33,7 +33,7 @@ export default function Auth() {
   }
 
   if (user) {
-    return <Navigate to={isVip ? '/Dashboard' : '/pending'} replace />;
+    return <Navigate to="/Dashboard" replace />;
   }
 
   const switchTab = (next) => {
@@ -48,8 +48,7 @@ export default function Auth() {
     setLoading(true);
     try {
       const data = await login(email, password);
-      const vip = ['vip', 'admin', 'super_admin'].includes(data.user.role);
-      navigate(vip ? '/Dashboard' : '/pending');
+      navigate('/Dashboard');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -63,7 +62,7 @@ export default function Auth() {
     setLoading(true);
     try {
       await register(name, email, password);
-      navigate('/pending');
+      navigate('/Dashboard');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -207,7 +206,7 @@ export default function Auth() {
               </button>
               <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 text-center">
                 <p className="text-amber-200 text-xs">
-                  Após registo, aguarda aprovação VIP pelo Chef Máximo para aceder aos sinais.
+                  Após registo, podes explorar o site. Os robôs ficam disponíveis quando o Chef Máximo aprovar a tua conta VIP.
                 </p>
               </div>
             </motion.form>

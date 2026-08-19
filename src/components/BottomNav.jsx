@@ -80,14 +80,20 @@ function NavItem({ to, icon: Icon, label, active, accent = 'emerald', badge }) {
 
 export default function BottomNav() {
   const location = useLocation();
-  const { isVip, isAdmin, isSuperAdmin } = useAuth();
+  const { user, isVip, isAdmin, isSuperAdmin } = useAuth();
 
-  if (!isVip) return null;
+  if (!user) return null;
 
   const tabs = [
     { path: '/Dashboard', icon: Dice5, label: 'Sinais', accent: 'emerald' },
     { path: '/Support', icon: MessageCircle, label: 'Suporte', accent: 'emerald' },
-    { path: '/Profile', icon: User, label: 'Perfil', accent: 'amber', badge: 'vip' },
+    {
+      path: '/Profile',
+      icon: User,
+      label: 'Perfil',
+      accent: 'amber',
+      badge: isVip ? 'vip' : null,
+    },
   ];
 
   if (isAdmin) {

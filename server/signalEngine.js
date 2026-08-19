@@ -3,7 +3,7 @@ import { scoreboardStore } from './scoreboardStore.js';
 
 /**
  * Motor de sinais — dados reais Evolution Bac Bo.
- * Placar = histórico persistente + sync moneytix (fonte única no servidor).
+ * Placar = histórico persistente + sync casino (fonte única no servidor).
  */
 export class SignalEngine {
   constructor(broadcast) {

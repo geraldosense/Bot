@@ -28,6 +28,19 @@ export function AuthProvider({ children }) {
     else setLoading(false);
   }, [token, fetchMe]);
 
+  useEffect(() => {
+    if (!token || !user) return undefined;
+    const ping = () => {
+      fetchJson('/api/auth/presence', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {});
+    };
+    ping();
+    const t = setInterval(ping, 60000);
+    return () => clearInterval(t);
+  }, [token, user?.id]);
+
   const login = async (email, password) => {
     const data = await fetchJson('/api/auth/login', {
       method: 'POST',
@@ -63,7 +76,9 @@ export function AuthProvider({ children }) {
   const isVip = ['vip', 'admin', 'super_admin'].includes(user?.role);
   const isAdmin = ['admin', 'super_admin'].includes(user?.role);
   const isSuperAdmin = user?.role === 'super_admin';
+  const isMember = user?.role === 'member';
   const canPromoteVip = isSuperAdmin;
+  const canRequestVip = isSuperAdmin || user?.permissions?.can_request_vip;
   const canViewActive = isSuperAdmin || user?.permissions?.can_view_active_users;
 
   return (
@@ -79,7 +94,9 @@ export function AuthProvider({ children }) {
         isVip,
         isAdmin,
         isSuperAdmin,
+        isMember,
         canPromoteVip,
+        canRequestVip,
         canViewActive,
       }}
     >

@@ -2,8 +2,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export function GuestRoute({ children }) {
-  const { user, loading, isVip } = useAuth();
-  const location = useLocation();
+  const { user, loading } = useAuth();
 
   if (loading) {
     return (
@@ -13,16 +12,13 @@ export function GuestRoute({ children }) {
     );
   }
 
-  if (user && isVip) return <Navigate to="/Dashboard" replace />;
-  if (user && !isVip && location.pathname !== '/pending') {
-    return <Navigate to="/pending" replace />;
-  }
-  if (user && !isVip) return children;
+  if (user) return <Navigate to="/Dashboard" replace />;
 
   return children;
 }
 
-export function ProtectedRoute({ children, requireVip = true }) {
+/** Qualquer utilizador autenticado (member, vip, admin) */
+export function ProtectedRoute({ children, requireVip = false }) {
   const { user, loading, isVip } = useAuth();
   const location = useLocation();
 
@@ -35,7 +31,7 @@ export function ProtectedRoute({ children, requireVip = true }) {
   }
 
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
-  if (requireVip && !isVip) return <Navigate to="/pending" replace />;
+  if (requireVip && !isVip) return <Navigate to="/Dashboard" replace />;
 
   return children;
 }

@@ -1,10 +1,13 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Crown, Calendar, LogOut, User as UserIcon } from 'lucide-react';
+import { Crown, Calendar, LogOut, User as UserIcon, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import BottomNav from '../components/BottomNav';
+import { VipStatusBanner } from '../components/VipLockedPanel';
 
 export default function Profile() {
-  const { user, logout, isVip, isAdmin, isSuperAdmin } = useAuth();
+  const { user, logout, isVip, isAdmin, isSuperAdmin, refreshUser } = useAuth();
+  const [checking, setChecking] = useState(false);
 
   const memberSince = user?.createdAt
     ? new Date(user.createdAt).toLocaleDateString('pt-PT')
@@ -15,6 +18,15 @@ export default function Profile() {
     admin: 'Administrador',
     vip: 'Membro VIP',
     member: 'Membro',
+  };
+
+  const handleRefresh = async () => {
+    setChecking(true);
+    try {
+      await refreshUser();
+    } finally {
+      setChecking(false);
+    }
   };
 
   return (
@@ -28,6 +40,20 @@ export default function Profile() {
         <h1 className="text-center text-lg font-black text-white tracking-widest mb-6">
           O MEU PERFIL
         </h1>
+
+        {!isVip && (
+          <div className="mb-4 space-y-3">
+            <VipStatusBanner user={user} compact />
+            <button
+              onClick={handleRefresh}
+              disabled={checking}
+              className="w-full py-2.5 rounded-xl bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 text-sm font-bold hover:bg-emerald-600/30 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              <RefreshCw className={`w-4 h-4 ${checking ? 'animate-spin' : ''}`} />
+              {checking ? 'A verificar...' : 'Verificar aprovação VIP'}
+            </button>
+          </div>
+        )}
 
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -44,14 +70,21 @@ export default function Profile() {
             </div>
           </div>
 
-          {isVip && (
+          {isVip ? (
             <div
               className="rounded-xl p-4 border border-amber-500/40 text-center"
               style={{ background: 'linear-gradient(135deg, rgba(217,119,6,0.15), rgba(180,83,9,0.1))' }}
             >
               <Crown className="w-8 h-8 text-amber-400 mx-auto mb-2" />
               <p className="text-amber-300 font-black">{roleLabel[user?.role] || 'Membro VIP'}</p>
-              <p className="text-amber-200/70 text-xs mt-1">Acesso total aos sinais da IA</p>
+              <p className="text-amber-200/70 text-xs mt-1">Acesso total aos robôs e sinais da IA</p>
+            </div>
+          ) : (
+            <div className="rounded-xl p-4 border border-zinc-700/50 bg-zinc-800/30 text-center">
+              <p className="text-zinc-300 font-bold text-sm">Conta standard</p>
+              <p className="text-zinc-500 text-xs mt-1">
+                Ainda não és VIP — os robôs dos casinos ficam bloqueados até aprovação.
+              </p>
             </div>
           )}
 
@@ -65,7 +98,9 @@ export default function Profile() {
 
           {(isAdmin || isSuperAdmin) && (
             <p className="text-purple-400 text-xs text-center font-bold">
-              {isSuperAdmin ? '👑 Chef Máximo — controlo total' : '🛡️ Admin — painel disponível'}
+              {isSuperAdmin
+                ? '👑 Chef Máximo — aprovas VIP e geres admins'
+                : '🛡️ Admin — podes solicitar VIP com aprovação do Chef'}
             </p>
           )}
         </motion.div>

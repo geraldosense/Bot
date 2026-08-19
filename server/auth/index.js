@@ -14,6 +14,12 @@ import {
   promoteToAdmin,
   updateAdminPermissions,
   listUsers,
+  listVipRequests,
+  requestVipPromotion,
+  rejectVipRequest,
+  recordLogin,
+  touchLastSeen,
+  getAccountStats,
   ROLES,
 } from './userStore.js';
 
@@ -95,11 +101,13 @@ export function registerAuthRoutes(app) {
         return res.status(400).json({ error: 'Password mínimo 6 caracteres' });
       }
       const user = await createUser({ email, password, name });
-      const token = signToken(user);
+      recordLogin(user.id);
+      const fresh = sanitizeUser(findById(user.id));
+      const token = signToken(fresh);
       res.json({
         token,
-        user,
-        message: 'Conta criada! Aguarda aprovação VIP pelo Chef Máximo para aceder aos sinais.',
+        user: fresh,
+        message: 'Conta criada! Explora o site — os robôs ficam disponíveis após aprovação VIP.',
       });
     } catch (err) {
       res.status(400).json({ error: err.message });
@@ -113,7 +121,7 @@ export function registerAuthRoutes(app) {
       if (!raw || !(await verifyPassword(raw, password))) {
         return res.status(401).json({ error: 'Email ou password incorretos' });
       }
-      const user = sanitizeUser(raw);
+      const user = recordLogin(raw.id) || sanitizeUser(raw);
       const token = signToken(user);
       res.json({ token, user });
     } catch (err) {
@@ -122,13 +130,64 @@ export function registerAuthRoutes(app) {
   });
 
   app.get('/api/auth/me', authMiddleware, (req, res) => {
-    res.json({ user: req.user });
+    const user = touchLastSeen(req.user.id) || req.user;
+    res.json({ user });
+  });
+
+  app.post('/api/auth/presence', authMiddleware, (req, res) => {
+    const user = touchLastSeen(req.user.id) || req.user;
+    res.json({ ok: true, user });
   });
 }
 
+function enrichUsersWithActivity(users, activeSessions, onlineMs = 5 * 60 * 1000) {
+  const iaByUser = new Map();
+  for (const u of activeSessions.getActiveUsers()) {
+    iaByUser.set(u.userId, u);
+  }
+  const now = Date.now();
+
+  return users
+    .filter((u) => u.role !== ROLES.SUPER_ADMIN)
+    .map((u) => {
+      const ia = iaByUser.get(u.id);
+      const lastSeenMs = u.lastSeenAt ? new Date(u.lastSeenAt).getTime() : 0;
+      const online = lastSeenMs > 0 && now - lastSeenMs <= onlineMs;
+      return {
+        ...u,
+        activity: {
+          online,
+          usingIa: !!ia,
+          iaConnections: ia?.connections || 0,
+          iaLastSeen: ia?.lastSeen || null,
+          lastLoginAt: u.lastLoginAt || null,
+          lastSeenAt: u.lastSeenAt || null,
+        },
+      };
+    })
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
 export function registerAdminRoutes(app, activeSessions) {
+  app.get('/api/admin/overview', authMiddleware, requireSuperAdmin, (_, res) => {
+    const users = enrichUsersWithActivity(listUsers(), activeSessions);
+    const iaActive = activeSessions.getActiveUsers();
+    const onlineNow = users.filter((u) => u.activity.online).length;
+
+    res.json({
+      stats: {
+        ...getAccountStats(),
+        onlineNow,
+        iaActiveNow: iaActive.length,
+        iaConnections: activeSessions.getConnectionCount(),
+      },
+      users,
+      iaActive,
+    });
+  });
+
   app.get('/api/admin/users', authMiddleware, requireSuperAdmin, (_, res) => {
-    res.json({ users: listUsers() });
+    res.json({ users: enrichUsersWithActivity(listUsers(), activeSessions) });
   });
 
   app.post('/api/admin/users/:id/approve-vip', authMiddleware, requireSuperAdmin, (req, res) => {
@@ -149,6 +208,41 @@ export function registerAdminRoutes(app, activeSessions) {
     }
   });
 
+  app.get('/api/admin/vip-requests', authMiddleware, requireSuperAdmin, (_, res) => {
+    res.json({ requests: listVipRequests() });
+  });
+
+  app.post(
+    '/api/admin/users/:id/request-vip',
+    authMiddleware,
+    requirePermission('can_request_vip'),
+    (req, res) => {
+      try {
+        const user = requestVipPromotion(req.params.id, req.user.id);
+        res.json({
+          user,
+          message: 'Pedido enviado ao Chef Máximo para aprovação VIP',
+        });
+      } catch (err) {
+        res.status(400).json({ error: err.message });
+      }
+    },
+  );
+
+  app.post('/api/admin/users/:id/reject-vip-request', authMiddleware, requireSuperAdmin, (req, res) => {
+    try {
+      const user = rejectVipRequest(req.params.id);
+      res.json({ user, message: 'Pedido VIP rejeitado' });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/admin/members', authMiddleware, requirePermission('can_request_vip'), (_, res) => {
+    const members = listUsers().filter((u) => u.role === ROLES.MEMBER);
+    res.json({ users: members });
+  });
+
   app.get('/api/admin/active-users', authMiddleware, requirePermission('can_view_active_users'), (_, res) => {
     const active = activeSessions.getActiveUsers();
     res.json({
@@ -160,8 +254,8 @@ export function registerAdminRoutes(app, activeSessions) {
 
   app.post('/api/admin/promote-admin/:id', authMiddleware, requireSuperAdmin, (req, res) => {
     try {
-      const { can_view_active_users = true } = req.body;
-      const user = promoteToAdmin(req.params.id, { can_view_active_users }, req.user.id);
+      const { can_view_active_users = true, can_request_vip = true } = req.body;
+      const user = promoteToAdmin(req.params.id, { can_view_active_users, can_request_vip }, req.user.id);
       res.json({ user, message: 'Promovido a Admin' });
     } catch (err) {
       res.status(400).json({ error: err.message });

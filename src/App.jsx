@@ -41,7 +41,7 @@ export default function App() {
         <Route
           path="/Dashboard"
           element={
-            <ProtectedRoute requireVip>
+            <ProtectedRoute requireVip={false}>
               <Dashboard />
             </ProtectedRoute>
           }
@@ -57,7 +57,7 @@ export default function App() {
         <Route
           path="/Profile"
           element={
-            <ProtectedRoute requireVip>
+            <ProtectedRoute requireVip={false}>
               <Profile />
             </ProtectedRoute>
           }
@@ -65,7 +65,7 @@ export default function App() {
         <Route
           path="/Support"
           element={
-            <ProtectedRoute requireVip>
+            <ProtectedRoute requireVip={false}>
               <Support />
             </ProtectedRoute>
           }
