@@ -1,5 +1,10 @@
-import { Users } from 'lucide-react';
-import { WHATSAPP_GROUP_NAME, WHATSAPP_GROUP_URL } from '../config/community';
+import { Users, ExternalLink } from 'lucide-react';
+import {
+  WHATSAPP_GROUP_NAME,
+  WHATSAPP_SUPPORT_MESSAGE,
+  getWhatsAppGroupJoinUrl,
+  getWhatsAppSupportUrl,
+} from '../config/community';
 
 export function WhatsAppIcon({ className = 'w-5 h-5' }) {
   return (
@@ -10,7 +15,7 @@ export function WhatsAppIcon({ className = 'w-5 h-5' }) {
 }
 
 /**
- * Cartão padrão — grupo WhatsApp (usado em Suporte, Perfil, VIP, etc.)
+ * Cartão padrão — grupo WhatsApp (Perfil, VIP, Dashboard, Auth)
  */
 export default function WhatsAppGroupCard({
   title = 'Grupo oficial WhatsApp',
@@ -18,40 +23,88 @@ export default function WhatsAppGroupCard({
   buttonLabel = 'Entrar no grupo WhatsApp',
   compact = false,
   showHint = true,
+  mode = 'group',
+  variant = 'card',
 }) {
+  const isSupport = mode === 'support';
+  const href = isSupport ? getWhatsAppSupportUrl() : getWhatsAppGroupJoinUrl();
+  const inline = variant === 'inline';
+
+  const inner = (
+    <>
+      {!inline && (title || description) && (
+        <div>
+          {title && <p className="text-white font-bold text-sm">{title}</p>}
+          {description && (
+            <p className="text-zinc-400 text-xs mt-1 leading-relaxed">{description}</p>
+          )}
+        </div>
+      )}
+
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`flex items-center justify-center gap-2.5 w-full py-3.5 rounded-xl text-white font-bold text-sm transition-transform active:scale-[0.98] ${
+          isSupport ? 'shadow-lg shadow-purple-900/40' : 'shadow-lg shadow-emerald-900/30'
+        }`}
+        style={{
+          background: isSupport
+            ? 'linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)'
+            : 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+        }}
+      >
+        <WhatsAppIcon className="w-5 h-5" />
+        {buttonLabel}
+        {isSupport && <ExternalLink className="w-4 h-4 opacity-80" />}
+      </a>
+
+      {showHint && (
+        <div
+          className={`flex items-start gap-2.5 rounded-lg px-3 py-2.5 border ${
+            isSupport
+              ? 'bg-purple-500/10 border-purple-500/25'
+              : 'bg-emerald-500/10 border-emerald-500/25'
+          }`}
+        >
+          <Users
+            className={`w-4 h-4 shrink-0 mt-0.5 ${isSupport ? 'text-purple-400' : 'text-emerald-400'}`}
+          />
+          <p
+            className={`text-[11px] leading-relaxed ${
+              isSupport ? 'text-purple-200/90' : 'text-emerald-200/90'
+            }`}
+          >
+            {isSupport ? (
+              <>
+                A mensagem{' '}
+                <span className="font-bold text-purple-300">&quot;{WHATSAPP_SUPPORT_MESSAGE}&quot;</span>{' '}
+                aparece automaticamente. Seleciona o grupo{' '}
+                <span className="font-bold text-purple-300">{WHATSAPP_GROUP_NAME}</span> e envia.
+              </>
+            ) : (
+              <>
+                <span className="font-bold text-emerald-300">{WHATSAPP_GROUP_NAME}</span> — grupo
+                exclusivo da comunidade. Toque no botão para abrir o WhatsApp e pedir entrada.
+              </>
+            )}
+          </p>
+        </div>
+      )}
+    </>
+  );
+
+  if (inline) {
+    return <div className="space-y-3">{inner}</div>;
+  }
+
   return (
     <div
       className={`bg-zinc-900/60 border border-zinc-700 rounded-xl space-y-4 ${
         compact ? 'p-3' : 'p-4'
       }`}
     >
-      <div>
-        <p className="text-white font-bold text-sm">{title}</p>
-        <p className="text-zinc-400 text-xs mt-1 leading-relaxed">{description}</p>
-      </div>
-
-      <a
-        href={WHATSAPP_GROUP_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center justify-center gap-2.5 w-full py-3.5 rounded-xl text-white font-bold text-sm shadow-lg shadow-emerald-900/30 transition-transform active:scale-[0.98]"
-        style={{
-          background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
-        }}
-      >
-        <WhatsAppIcon className="w-5 h-5" />
-        {buttonLabel}
-      </a>
-
-      {showHint && (
-        <div className="flex items-start gap-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/25 px-3 py-2.5">
-          <Users className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-          <p className="text-emerald-200/90 text-[11px] leading-relaxed">
-            <span className="font-bold text-emerald-300">{WHATSAPP_GROUP_NAME}</span> — grupo
-            exclusivo da comunidade. Toque no botão verde para abrir o WhatsApp e pedir entrada.
-          </p>
-        </div>
-      )}
+      {inner}
     </div>
   );
 }
