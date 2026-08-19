@@ -23,6 +23,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3001;
 const app = express();
 
+app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json());
 
@@ -139,11 +140,12 @@ app.get('*', (req, res) => {
   });
 });
 
-httpServer.listen(PORT, async () => {
+httpServer.listen(PORT, '0.0.0.0', async () => {
   await casino.start();
-  console.log(`🎰 Bac Bo Bot — Evolution Casino LIVE`);
-  console.log(`   http://localhost:${PORT}`);
-  console.log(`   Auth: login → aderir → aprovação VIP por admin`);
+  const base = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+  console.log(`🎰 Sense Bot — Evolution Casino LIVE`);
+  console.log(`   ${base}`);
+  console.log(`   Auth: login → registo → aprovação VIP`);
 });
 
 process.on('SIGINT', () => {

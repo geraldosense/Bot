@@ -21,7 +21,19 @@ npm run dev
 - Frontend: http://localhost:5173
 - Backend + WebSocket: http://localhost:3001
 
-## Go Live / Produção
+## Publicar na internet (qualquer telemóvel)
+
+O site **não funciona** só com Vercel (`*.vercel.app`) — falta o servidor Node.js e WebSocket.
+
+**Guia completo:** [DEPLOY.md](./DEPLOY.md)
+
+Resumo rápido:
+1. Push do código para GitHub
+2. [Render.com](https://render.com) → **New → Blueprint** → repo `geraldosense/Bot`
+3. Define `SUPER_ADMIN_EMAIL` e `SUPER_ADMIN_PASSWORD`
+4. Partilha o URL `https://sense-bot-xxxx.onrender.com` no WhatsApp
+
+## Go Live / Produção local
 
 ```bash
 npm run go-live

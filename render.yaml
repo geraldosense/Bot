@@ -1,0 +1,25 @@
+# Deploy completo — frontend + API + WebSocket num único URL público
+# Ligar em: https://dashboard.render.com → New → Blueprint → repo GitHub
+services:
+  - type: web
+    name: sense-bot
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SUPER_ADMIN_EMAIL
+        sync: false
+      - key: SUPER_ADMIN_PASSWORD
+        sync: false
+    disk:
+      name: sense-bot-data
+      mountPath: /opt/render/project/src/server/data
+      sizeGB: 1
