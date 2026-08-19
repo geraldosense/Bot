@@ -94,7 +94,7 @@ function DailyScoreStrip({ stats, gameName, live, playsToday }) {
 
       {playsToday > 0 && (
         <p className="text-zinc-600 text-[9px] text-center mt-2">
-          Histórico do robô · {playsToday} jogadas · perda só após esgotar entrada e gales
+          Histórico do robô · {playsToday} jogadas · perda só após entrada + 3 gales
         </p>
       )}
     </div>

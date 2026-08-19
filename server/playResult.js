@@ -2,7 +2,8 @@
 
 export const MAX_GALES = 2;
 export const GALE_ATTEMPTS = MAX_GALES + 1;
-export const ATTEMPT_LABELS = ['ENTRADA', '1° GALE', '2° GALE'];
+export const ATTEMPT_LABELS = ['ENTRADA', '1° GALE', '2° GALE', '3° GALE'];
+export const GALE_ONLY_LABELS = ['1° GALE', '2° GALE', '3° GALE'];
 
 /**
  * Classifica o resultado final de uma jogada.
@@ -62,7 +63,7 @@ export function buildPlayResultAlert(signal, outcome) {
   return {
     outcome: 'loss',
     title: 'PERDEU',
-    message: `Perdeu ${prep} ${attemptLabel} — entrada e gales esgotados`,
+    message: `Perdeu ${prep} ${attemptLabel} — entrada e 3 gales esgotados`,
     sub: bet ? `Entrada: ${bet}` : 'Todos os gales esgotados',
     galeLabel: attemptLabel,
   };

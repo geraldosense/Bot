@@ -2,7 +2,9 @@
 
 export const MAX_GALES = 2;
 export const GALE_ATTEMPTS = MAX_GALES + 1;
-export const ATTEMPT_LABELS = ['ENTRADA', '1° GALE', '2° GALE'];
+export const ATTEMPT_LABELS = ['ENTRADA', '1° GALE', '2° GALE', '3° GALE'];
+export const GALE_ONLY_LABELS = ['1° GALE', '2° GALE', '3° GALE'];
+export const MAX_GALE_ROUNDS = 3;
 
 export function classifyPlayResult(signal) {
   if (!signal || signal.signal_status !== 'result') return null;

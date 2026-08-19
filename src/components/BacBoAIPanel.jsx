@@ -381,7 +381,7 @@ function StatusPanel({
           {sub}
         </p>
 
-        <GaleProgressBars signal={signal} progress={galeProgress} />
+        <GaleProgressBars progress={galeProgress} />
 
         <AnimatePresence mode="wait">
           <motion.h2

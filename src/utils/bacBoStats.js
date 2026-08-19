@@ -146,28 +146,38 @@ export function getPredictedZone(signal, showMonitoring) {
   return null;
 }
 
-/** Entrada inicial + gales após falha (API current_gale 0-based) */
-export const ATTEMPT_LABELS = ['ENTRADA', '1° GALE', '2° GALE'];
+/** Entrada inicial (não é gale) + 3 gales após falha da entrada */
+export const ENTRY_LABEL = 'ENTRADA';
+export const GALE_ONLY_LABELS = ['1° GALE', '2° GALE', '3° GALE'];
+export const MAX_GALE_ROUNDS = GALE_ONLY_LABELS.length;
+export const ATTEMPT_LABELS = [ENTRY_LABEL, ...GALE_ONLY_LABELS];
 export const TOTAL_ATTEMPTS = ATTEMPT_LABELS.length;
-/** @deprecated use TOTAL_ATTEMPTS — mantido por compatibilidade */
+/** @deprecated */
 export const TOTAL_GALE_ATTEMPTS = TOTAL_ATTEMPTS;
-export const GALE_ROUNDS = TOTAL_ATTEMPTS - 1;
+export const GALE_ROUNDS = MAX_GALE_ROUNDS;
 
-/** API: 0 = entrada (não é gale), 1 = 1° gale, 2 = 2° gale */
+/** API: 0 = entrada · 1 = 1° gale · 2 = 2° gale · 3 = 3° gale */
+export function apiToGaleBarIndex(apiGale = 0) {
+  const n = Number(apiGale) || 0;
+  if (n <= 0) return -1;
+  return Math.min(n - 1, MAX_GALE_ROUNDS - 1);
+}
+
 export function formatAttemptLabel(apiGale = 0) {
-  const idx = Math.max(0, Math.min(Number(apiGale) || 0, TOTAL_ATTEMPTS - 1));
+  const idx = Math.max(0, Math.min(Number(apiGale) || 0, ATTEMPT_LABELS.length - 1));
   return ATTEMPT_LABELS[idx];
+}
+
+export function formatGaleOnlyLabel(apiGale = 0) {
+  const idx = apiToGaleBarIndex(apiGale);
+  if (idx < 0) return null;
+  return GALE_ONLY_LABELS[idx];
 }
 
 export function isEntryAttempt(apiGale = 0) {
   return Number(apiGale) === 0;
 }
 
-export function apiGaleToBarIndex(apiGale = 0) {
-  return Math.max(0, Math.min(Number(apiGale) || 0, TOTAL_ATTEMPTS - 1));
-}
-
-/** Etiqueta da tentativa — entrada ou gale */
 export function formatGaleLabel(apiGale = 0) {
   return formatAttemptLabel(apiGale);
 }
@@ -175,7 +185,7 @@ export function formatGaleLabel(apiGale = 0) {
 export function formatResultAttemptLine(signal) {
   const label = formatAttemptLabel(signal?.current_gale);
   const isGreen = String(signal?.result || '').toLowerCase() === 'green';
-  const prep = label === 'ENTRADA' ? 'na' : 'no';
+  const prep = label === ENTRY_LABEL ? 'na' : 'no';
   return isGreen ? `Acertou ${prep} ${label}` : `Perdeu ${prep} ${label}`;
 }
 
@@ -191,8 +201,9 @@ export function getStatusLabel(signal, showMonitoring) {
   }
   if (signal.signal_status === 'gale_update') {
     const apiGale = Number(signal.current_gale) || 0;
+    const galeLabel = formatGaleOnlyLabel(apiGale) || 'GALE';
     return {
-      sub: formatAttemptLabel(apiGale),
+      sub: galeLabel,
       main: 'MANTER A MESMA COR',
     };
   }
@@ -210,59 +221,43 @@ export function getColorConfig(zone) {
   return BACBO_COLORS[zone] || null;
 }
 
-/** Barras: ENTRADA → 1° gale → 2° gale (só após falha da entrada) */
+/** Entrada separada + 3 barras de gale (só após falha da entrada) */
 export function getGaleProgress(signal) {
   if (!signal || !['confirmed', 'gale_update', 'result'].includes(signal.signal_status)) {
     return null;
   }
 
-  const galesAllowed = Number(signal.gales) || 2;
-  const currentGale = Number(signal.current_gale) || 0;
+  const apiGale = Number(signal.current_gale) || 0;
+  const galeIdx = apiToGaleBarIndex(apiGale);
 
-  let activeIndex = 0;
-  let failedIndex = -1;
+  let entryState = 'pending';
+  const galeStates = GALE_ONLY_LABELS.map(() => 'pending');
 
   if (signal.signal_status === 'confirmed') {
-    activeIndex = 0;
+    entryState = 'active';
   } else if (signal.signal_status === 'gale_update') {
-    activeIndex = apiGaleToBarIndex(currentGale);
+    entryState = 'done';
+    if (galeIdx >= 0) {
+      galeStates[galeIdx] = 'active';
+      for (let i = 0; i < galeIdx; i++) galeStates[i] = 'done';
+    }
   } else if (signal.signal_status === 'result') {
-    const idx = apiGaleToBarIndex(currentGale);
-    if (signal.result === 'green') {
-      activeIndex = idx;
+    const isGreen = signal.result === 'green';
+
+    if (apiGale === 0) {
+      entryState = isGreen ? 'done' : 'failed';
     } else {
-      failedIndex = idx;
+      entryState = 'done';
+      if (galeIdx >= 0) {
+        for (let i = 0; i < galeIdx; i++) galeStates[i] = 'done';
+        galeStates[galeIdx] = isGreen ? 'done' : 'failed';
+      }
     }
   }
 
   return {
-    labels: ATTEMPT_LABELS,
-    activeIndex,
-    failedIndex,
-    galesAllowed,
+    entry: { label: ENTRY_LABEL, state: entryState },
+    gales: GALE_ONLY_LABELS.map((label, i) => ({ label, state: galeStates[i] })),
     show: true,
   };
-}
-
-export function getGaleBarState(index, progress, signal) {
-  if (!progress) return 'hidden';
-
-  const { activeIndex, failedIndex } = progress;
-  const isResult = signal?.signal_status === 'result';
-  const isGreen = signal?.result === 'green';
-
-  if (failedIndex >= 0) {
-    if (index < failedIndex) return 'done';
-    if (index === failedIndex) return 'failed';
-    return 'pending';
-  }
-
-  if (isResult && isGreen) {
-    if (index <= activeIndex) return 'done';
-    return 'pending';
-  }
-
-  if (index < activeIndex) return 'done';
-  if (index === activeIndex) return 'active';
-  return 'pending';
 }
