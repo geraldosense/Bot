@@ -1,9 +1,10 @@
-import { Users, ExternalLink } from 'lucide-react';
+import { useState } from 'react';
+import { Users, ExternalLink, Check } from 'lucide-react';
 import {
   WHATSAPP_GROUP_NAME,
   WHATSAPP_SUPPORT_MESSAGE,
   getWhatsAppGroupJoinUrl,
-  getWhatsAppSupportUrl,
+  openWhatsAppGroupSupport,
 } from '../config/community';
 
 export function WhatsAppIcon({ className = 'w-5 h-5' }) {
@@ -15,7 +16,7 @@ export function WhatsAppIcon({ className = 'w-5 h-5' }) {
 }
 
 /**
- * Cartão padrão — grupo WhatsApp (Perfil, VIP, Dashboard, Auth)
+ * Cartão padrão — grupo WhatsApp (Perfil, VIP, Dashboard, Auth, Suporte)
  */
 export default function WhatsAppGroupCard({
   title = 'Grupo oficial WhatsApp',
@@ -27,8 +28,25 @@ export default function WhatsAppGroupCard({
   variant = 'card',
 }) {
   const isSupport = mode === 'support';
-  const href = isSupport ? getWhatsAppSupportUrl() : getWhatsAppGroupJoinUrl();
   const inline = variant === 'inline';
+  const [sentHint, setSentHint] = useState(false);
+
+  const handleSupportClick = async () => {
+    const { copied } = await openWhatsAppGroupSupport();
+    setSentHint(true);
+    if (!copied) return;
+    setTimeout(() => setSentHint(false), 6000);
+  };
+
+  const buttonClass = `flex items-center justify-center gap-2.5 w-full py-3.5 rounded-xl text-white font-bold text-sm transition-transform active:scale-[0.98] ${
+    isSupport ? 'shadow-lg shadow-purple-900/40' : 'shadow-lg shadow-emerald-900/30'
+  }`;
+
+  const buttonStyle = {
+    background: isSupport
+      ? 'linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)'
+      : 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+  };
 
   const inner = (
     <>
@@ -41,51 +59,67 @@ export default function WhatsAppGroupCard({
         </div>
       )}
 
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`flex items-center justify-center gap-2.5 w-full py-3.5 rounded-xl text-white font-bold text-sm transition-transform active:scale-[0.98] ${
-          isSupport ? 'shadow-lg shadow-purple-900/40' : 'shadow-lg shadow-emerald-900/30'
-        }`}
-        style={{
-          background: isSupport
-            ? 'linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)'
-            : 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
-        }}
-      >
-        <WhatsAppIcon className="w-5 h-5" />
-        {buttonLabel}
-        {isSupport && <ExternalLink className="w-4 h-4 opacity-80" />}
-      </a>
+      {isSupport ? (
+        <button type="button" onClick={handleSupportClick} className={buttonClass} style={buttonStyle}>
+          <WhatsAppIcon className="w-5 h-5" />
+          {buttonLabel}
+          <ExternalLink className="w-4 h-4 opacity-80" />
+        </button>
+      ) : (
+        <a
+          href={getWhatsAppGroupJoinUrl()}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={buttonClass}
+          style={buttonStyle}
+        >
+          <WhatsAppIcon className="w-5 h-5" />
+          {buttonLabel}
+        </a>
+      )}
 
       {showHint && (
         <div
           className={`flex items-start gap-2.5 rounded-lg px-3 py-2.5 border ${
-            isSupport
-              ? 'bg-purple-500/10 border-purple-500/25'
-              : 'bg-emerald-500/10 border-emerald-500/25'
+            sentHint
+              ? 'bg-emerald-500/10 border-emerald-500/30'
+              : isSupport
+                ? 'bg-purple-500/10 border-purple-500/25'
+                : 'bg-emerald-500/10 border-emerald-500/25'
           }`}
         >
-          <Users
-            className={`w-4 h-4 shrink-0 mt-0.5 ${isSupport ? 'text-purple-400' : 'text-emerald-400'}`}
-          />
+          {sentHint ? (
+            <Check className="w-4 h-4 shrink-0 mt-0.5 text-emerald-400" />
+          ) : (
+            <Users
+              className={`w-4 h-4 shrink-0 mt-0.5 ${isSupport ? 'text-purple-400' : 'text-emerald-400'}`}
+            />
+          )}
           <p
             className={`text-[11px] leading-relaxed ${
-              isSupport ? 'text-purple-200/90' : 'text-emerald-200/90'
+              sentHint
+                ? 'text-emerald-200/90'
+                : isSupport
+                  ? 'text-purple-200/90'
+                  : 'text-emerald-200/90'
             }`}
           >
-            {isSupport ? (
+            {sentHint ? (
               <>
-                A mensagem{' '}
-                <span className="font-bold text-purple-300">&quot;{WHATSAPP_SUPPORT_MESSAGE}&quot;</span>{' '}
-                aparece automaticamente. Seleciona o grupo{' '}
-                <span className="font-bold text-purple-300">{WHATSAPP_GROUP_NAME}</span> e envia.
+                Grupo <span className="font-bold text-emerald-300">{WHATSAPP_GROUP_NAME}</span>{' '}
+                aberto! Cola a mensagem copiada no chat e envia.
+              </>
+            ) : isSupport ? (
+              <>
+                Abre o grupo{' '}
+                <span className="font-bold text-purple-300">{WHATSAPP_GROUP_NAME}</span> e copia
+                automaticamente:{' '}
+                <span className="font-bold text-purple-300">&quot;{WHATSAPP_SUPPORT_MESSAGE}&quot;</span>
               </>
             ) : (
               <>
                 <span className="font-bold text-emerald-300">{WHATSAPP_GROUP_NAME}</span> — grupo
-                exclusivo da comunidade. Toque no botão para abrir o WhatsApp e pedir entrada.
+                exclusivo da comunidade. Toque no botão para entrar no WhatsApp.
               </>
             )}
           </p>
