@@ -18,6 +18,10 @@ import {
   listVipRequests,
   requestVipPromotion,
   rejectVipRequest,
+  requestVipRevocation,
+  listVipRevocationRequests,
+  approveVipRevocation,
+  rejectVipRevocationRequest,
   recordLogin,
   touchLastSeen,
   getAccountStats,
@@ -83,7 +87,7 @@ export function requireAdmin(req, res, next) {
 
 export function requireSuperAdmin(req, res, next) {
   if (req.user.role !== ROLES.SUPER_ADMIN) {
-    return res.status(403).json({ error: 'Acesso Chef Máximo necessário' });
+    return res.status(403).json({ error: 'Acesso Proprietário necessário' });
   }
   next();
 }
@@ -243,7 +247,7 @@ export function registerAdminRoutes(app, activeSessions) {
         const user = await requestVipPromotion(req.params.id, req.user.id);
         res.json({
           user,
-          message: 'Pedido enviado ao Chef Máximo para aprovação VIP',
+          message: 'Pedido enviado ao Proprietário para aprovação VIP',
         });
       } catch (err) {
         res.status(400).json({ error: err.message });
@@ -268,6 +272,68 @@ export function registerAdminRoutes(app, activeSessions) {
       res.status(500).json({ error: err.message });
     }
   });
+
+  app.get('/api/admin/vips', authMiddleware, requirePermission('can_request_vip'), async (_, res) => {
+    try {
+      const vips = (await listUsers()).filter((u) => u.role === ROLES.VIP).map(sanitizeUser);
+      res.json({ users: vips });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post(
+    '/api/admin/users/:id/request-vip-revocation',
+    authMiddleware,
+    requirePermission('can_request_vip'),
+    async (req, res) => {
+      try {
+        const user = await requestVipRevocation(req.params.id, req.user.id, req.body?.reason);
+        res.json({
+          user,
+          message: 'Pedido de exoneração VIP enviado ao Proprietário',
+        });
+      } catch (err) {
+        res.status(400).json({ error: err.message });
+      }
+    },
+  );
+
+  app.get('/api/admin/vip-revocation-requests', authMiddleware, requireSuperAdmin, async (_, res) => {
+    try {
+      res.json({ requests: await listVipRevocationRequests() });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post(
+    '/api/admin/users/:id/approve-vip-revocation',
+    authMiddleware,
+    requireSuperAdmin,
+    async (req, res) => {
+      try {
+        const user = await approveVipRevocation(req.params.id, req.user.id);
+        res.json({ user, message: 'Exoneração VIP aprovada — utilizador voltou a membro' });
+      } catch (err) {
+        res.status(400).json({ error: err.message });
+      }
+    },
+  );
+
+  app.post(
+    '/api/admin/users/:id/reject-vip-revocation',
+    authMiddleware,
+    requireSuperAdmin,
+    async (req, res) => {
+      try {
+        const user = await rejectVipRevocationRequest(req.params.id);
+        res.json({ user, message: 'Pedido de exoneração rejeitado' });
+      } catch (err) {
+        res.status(400).json({ error: err.message });
+      }
+    },
+  );
 
   app.get('/api/admin/active-users', authMiddleware, requirePermission('can_view_active_users'), (_, res) => {
     const active = activeSessions.getActiveUsers();

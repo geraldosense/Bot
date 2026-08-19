@@ -4,6 +4,8 @@ import { Crown, Calendar, LogOut, User as UserIcon, RefreshCw } from 'lucide-rea
 import { useAuth } from '../context/AuthContext';
 import BottomNav from '../components/BottomNav';
 import { VipStatusBanner } from '../components/VipLockedPanel';
+import WhatsAppGroupCard from '../components/WhatsAppGroupCard';
+import { getRoleLabel } from '../utils/roles';
 
 export default function Profile() {
   const { user, logout, isVip, isAdmin, isSuperAdmin, refreshUser } = useAuth();
@@ -13,12 +15,7 @@ export default function Profile() {
     ? new Date(user.createdAt).toLocaleDateString('pt-PT')
     : '—';
 
-  const roleLabel = {
-    super_admin: 'Chef Máximo',
-    admin: 'Administrador',
-    vip: 'Membro VIP',
-    member: 'Membro',
-  };
+  const roleLabel = getRoleLabel(user?.role);
 
   const handleRefresh = async () => {
     setChecking(true);
@@ -44,6 +41,7 @@ export default function Profile() {
         {!isVip && (
           <div className="mb-4 space-y-3">
             <VipStatusBanner user={user} compact />
+            <WhatsAppGroupCard compact showHint={false} />
             <button
               onClick={handleRefresh}
               disabled={checking}
@@ -76,7 +74,7 @@ export default function Profile() {
               style={{ background: 'linear-gradient(135deg, rgba(217,119,6,0.15), rgba(180,83,9,0.1))' }}
             >
               <Crown className="w-8 h-8 text-amber-400 mx-auto mb-2" />
-              <p className="text-amber-300 font-black">{roleLabel[user?.role] || 'Membro VIP'}</p>
+              <p className="text-amber-300 font-black">{roleLabel || 'Membro VIP'}</p>
               <p className="text-amber-200/70 text-xs mt-1">Acesso total aos robôs e sinais da IA</p>
             </div>
           ) : (
@@ -99,8 +97,8 @@ export default function Profile() {
           {(isAdmin || isSuperAdmin) && (
             <p className="text-purple-400 text-xs text-center font-bold">
               {isSuperAdmin
-                ? '👑 Chef Máximo — aprovas VIP e geres admins'
-                : '🛡️ Admin — podes solicitar VIP com aprovação do Chef'}
+                ? '👑 Proprietário — aprovas VIP, exonerações e geres admins'
+                : '🛡️ Admin — podes solicitar VIP ou exoneração com aprovação do Proprietário'}
             </p>
           )}
         </motion.div>

@@ -19,12 +19,12 @@ const BAR_STYLES = {
   },
 };
 
-function ProgressBar({ label, state, wide = false }) {
+function ProgressBar({ label, state }) {
   const styles = BAR_STYLES[state] || BAR_STYLES.pending;
   const isActive = state === 'active';
 
   return (
-    <div className={`flex flex-col items-center gap-1.5 ${wide ? 'w-full' : 'flex-1'}`}>
+    <div className="flex-1 flex flex-col items-center gap-1.5">
       <motion.div
         className={`w-full h-1.5 rounded-full ${styles.bar}`}
         animate={
@@ -43,19 +43,14 @@ function ProgressBar({ label, state, wide = false }) {
   );
 }
 
+/** 3 gales — entrada mostra-se só pela cor PREVISÃO, não por barra */
 export default function GaleProgressBars({ progress }) {
   if (!progress?.show) return null;
 
-  const { entry, gales } = progress;
-
   return (
-    <div className="w-full max-w-[300px] mx-auto mt-3 mb-1 space-y-2.5">
-      {/* Entrada inicial — nunca conta como gale */}
-      <ProgressBar label={entry.label} state={entry.state} wide />
-
-      {/* 3 gales — só activam após falha da entrada */}
+    <div className="w-full max-w-[280px] mx-auto mt-3 mb-1">
       <div className="flex items-center gap-2">
-        {gales.map((gale) => (
+        {progress.gales.map((gale) => (
           <ProgressBar key={gale.label} label={gale.label} state={gale.state} />
         ))}
       </div>

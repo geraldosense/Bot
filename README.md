@@ -48,7 +48,7 @@ Abre ao tocar no card **Bac Bo** ou em *Abrir robô do Bac Bo*:
 - Placar e assertividade em tempo real
 
 ### Menu inferior
-**Sinais** · **Suporte** · **Perfil** · **Chef** (administradores)
+**Sinais** · **Suporte** · **Perfil** · **Proprietário** (administradores)
 
 ---
 
@@ -56,15 +56,15 @@ Abre ao tocar no card **Bac Bo** ou em *Abrir robô do Bac Bo*:
 
 1. Registo no site  
 2. Exploração da plataforma (área pública)  
-3. Aprovação VIP pelo **Chef Máximo**  
+3. Aprovação VIP pelo **Proprietário**  
 4. Acesso completo ao robô Bac Bo e sinais ao vivo  
 
 | Perfil | Acesso |
 |--------|--------|
 | Membro | Site, perfil e suporte |
 | VIP | Robô Bac Bo e sinais ao vivo |
-| Admin | Solicita VIP (Chef aprova) |
-| Chef Máximo | Controlo total e lista de registados |
+| Admin | Solicita VIP ou exoneração (Proprietário aprova) |
+| Proprietário | Controlo total e lista de registados |
 
 ---
 

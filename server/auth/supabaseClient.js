@@ -71,6 +71,7 @@ function rowToUser(row) {
     vipApprovedAt: row.vip_approved_at,
     vipApprovedBy: row.vip_approved_by,
     vipRequest: row.vip_request,
+    vipRevocationRequest: row.vip_revocation_request,
     lastLoginAt: row.last_login_at,
     lastSeenAt: row.last_seen_at,
     createdAt: row.created_at,
@@ -89,6 +90,7 @@ function userToRow(user) {
     vip_approved_at: user.vipApprovedAt || null,
     vip_approved_by: user.vipApprovedBy || null,
     vip_request: user.vipRequest || null,
+    vip_revocation_request: user.vipRevocationRequest || null,
     last_login_at: user.lastLoginAt || null,
     last_seen_at: user.lastSeenAt || null,
     created_at: user.createdAt,
@@ -155,6 +157,7 @@ export async function sbUpdateUser(id, patch) {
   if (patch.vipApprovedAt !== undefined) rowPatch.vip_approved_at = patch.vipApprovedAt;
   if (patch.vipApprovedBy !== undefined) rowPatch.vip_approved_by = patch.vipApprovedBy;
   if (patch.vipRequest !== undefined) rowPatch.vip_request = patch.vipRequest;
+  if (patch.vipRevocationRequest !== undefined) rowPatch.vip_revocation_request = patch.vipRevocationRequest;
   if (patch.lastLoginAt !== undefined) rowPatch.last_login_at = patch.lastLoginAt;
   if (patch.lastSeenAt !== undefined) rowPatch.last_seen_at = patch.lastSeenAt;
   rowPatch.updated_at = new Date().toISOString();

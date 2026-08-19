@@ -19,11 +19,13 @@ import {
 import { useAuth, authHeaders } from '../context/AuthContext';
 import BottomNav from '../components/BottomNav';
 import { fetchJson } from '../lib/api';
+import { getRoleLabel } from '../utils/roles';
 
 const ROLE_LABEL = {
   member: 'Membro',
   vip: 'VIP',
-  admin: 'Admin',
+  admin: 'Administrador',
+  super_admin: 'Proprietário',
 };
 
 function formatDateTime(value) {
@@ -70,7 +72,9 @@ export default function Admin() {
   const [users, setUsers] = useState([]);
   const [stats, setStats] = useState(null);
   const [vipRequests, setVipRequests] = useState([]);
+  const [revocationRequests, setRevocationRequests] = useState([]);
   const [members, setMembers] = useState([]);
+  const [adminVips, setAdminVips] = useState([]);
   const [iaActive, setIaActive] = useState([]);
   const [tab, setTab] = useState('vip-requests');
   const [search, setSearch] = useState('');
@@ -133,10 +137,15 @@ export default function Admin() {
         setStorageMode(overview.storage || null);
 
         try {
-          const requests = await fetchJson('/api/admin/vip-requests', opts);
+          const [requests, revocations] = await Promise.all([
+            fetchJson('/api/admin/vip-requests', opts),
+            fetchJson('/api/admin/vip-revocation-requests', opts),
+          ]);
           setVipRequests(requests.requests || []);
+          setRevocationRequests(revocations.requests || []);
         } catch {
           setVipRequests([]);
+          setRevocationRequests([]);
         }
         return;
       }
@@ -144,6 +153,7 @@ export default function Admin() {
       const requests = [];
       if (canRequestVip) {
         requests.push(fetchJson('/api/admin/members', { headers: authHeaders(token) }));
+        requests.push(fetchJson('/api/admin/vips', { headers: authHeaders(token) }));
       }
       if (canViewActive) {
         requests.push(fetchJson('/api/admin/active-users', { headers: authHeaders(token) }));
@@ -153,6 +163,8 @@ export default function Admin() {
       let idx = 0;
       if (canRequestVip) {
         setMembers(results[idx]?.users || []);
+        idx += 1;
+        setAdminVips(results[idx]?.users || []);
         idx += 1;
       }
       if (canViewActive && results[idx]) {
@@ -228,6 +240,50 @@ export default function Admin() {
     }
   };
 
+  const requestVipRevocation = async (id, name) => {
+    const reason = prompt(
+      `Motivo da exoneração VIP de ${name || 'este utilizador'} (opcional):`,
+    );
+    if (reason === null) return;
+    try {
+      const d = await fetchJson(`/api/admin/users/${id}/request-vip-revocation`, {
+        method: 'POST',
+        headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reason || '' }),
+      });
+      setMsg(d.message || d.error);
+      load();
+    } catch (err) {
+      setMsg(err.message);
+    }
+  };
+
+  const approveRevocation = async (id) => {
+    try {
+      const d = await fetchJson(`/api/admin/users/${id}/approve-vip-revocation`, {
+        method: 'POST',
+        headers: authHeaders(token),
+      });
+      setMsg(d.message || d.error);
+      load();
+    } catch (err) {
+      setMsg(err.message);
+    }
+  };
+
+  const rejectRevocation = async (id) => {
+    try {
+      const d = await fetchJson(`/api/admin/users/${id}/reject-vip-revocation`, {
+        method: 'POST',
+        headers: authHeaders(token),
+      });
+      setMsg(d.message || d.error);
+      load();
+    } catch (err) {
+      setMsg(err.message);
+    }
+  };
+
   const promoteAdmin = async (id) => {
     try {
       const d = await fetchJson(`/api/admin/promote-admin/${id}`, {
@@ -282,7 +338,7 @@ export default function Admin() {
             <p className="text-zinc-500 text-xs mt-1">
               {isSuperAdmin
                 ? 'Todos os registos, emails e utilização da IA'
-                : 'Solicita VIP — o Chef Máximo aprova'}
+                : 'Solicita VIP ou exoneração — o Proprietário aprova'}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -297,7 +353,7 @@ export default function Admin() {
             </button>
             {isSuperAdmin && (
               <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2.5 py-1 rounded-full font-bold">
-                👑 CHEF
+                👑 PROPRIETÁRIO
               </span>
             )}
           </div>
@@ -387,6 +443,12 @@ export default function Admin() {
             <StatCard icon={Crown} label="Contas VIP" value={stats.vip} color="text-amber-400" />
             <StatCard icon={UserCheck} label="Membros" value={stats.members} color="text-zinc-300" />
             <StatCard icon={Send} label="Pedidos VIP" value={stats.vipRequests} color="text-purple-300" />
+            <StatCard
+              icon={X}
+              label="Exonerações"
+              value={stats.vipRevocationRequests ?? revocationRequests.length}
+              color="text-red-300"
+            />
           </div>
         )}
 
@@ -434,7 +496,11 @@ export default function Admin() {
           <>
             <div className="flex gap-2 overflow-x-auto pb-1">
               {[
-                { id: 'vip-requests', label: `Pedidos (${vipRequests.length})` },
+                { id: 'vip-requests', label: `Pedidos VIP (${vipRequests.length})` },
+                {
+                  id: 'revocation-requests',
+                  label: `Exonerações (${revocationRequests.length})`,
+                },
                 { id: 'pending', label: `Membros (${pending.length})` },
                 { id: 'vip', label: `VIP (${vips.length})` },
                 { id: 'admins', label: `Admins (${admins.length})` },
@@ -474,6 +540,43 @@ export default function Admin() {
                         </button>
                         <button
                           onClick={() => rejectRequest(u.id)}
+                          className="flex items-center gap-1 px-2.5 py-2 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-white text-xs font-bold transition-colors"
+                        >
+                          <X className="w-3.5 h-3.5" /> Rejeitar
+                        </button>
+                      </div>
+                    </div>
+                  </UserCard>
+                ))}
+              </Section>
+            )}
+
+            {tab === 'revocation-requests' && (
+              <Section
+                title="Pedidos de exoneração VIP"
+                empty="Nenhum pedido de exoneração pendente"
+                count={revocationRequests.length}
+              >
+                {revocationRequests.map((u) => (
+                  <UserCard key={u.id} user={u} badge="EXONERAÇÃO">
+                    <div className="text-right shrink-0 space-y-1">
+                      <p className="text-zinc-500 text-[10px]">
+                        Solicitado por {u.requestedByName}
+                      </p>
+                      {u.vipRevocationRequest?.reason && (
+                        <p className="text-zinc-400 text-[10px] max-w-[140px] truncate">
+                          {u.vipRevocationRequest.reason}
+                        </p>
+                      )}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => approveRevocation(u.id)}
+                          className="flex items-center gap-1 px-3 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-white text-xs font-bold transition-colors"
+                        >
+                          <Check className="w-3.5 h-3.5" /> Aprovar
+                        </button>
+                        <button
+                          onClick={() => rejectRevocation(u.id)}
                           className="flex items-center gap-1 px-2.5 py-2 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-white text-xs font-bold transition-colors"
                         >
                           <X className="w-3.5 h-3.5" /> Rejeitar
@@ -579,6 +682,16 @@ export default function Admin() {
               >
                 Membros ({adminMemberList.length})
               </button>
+              <button
+                onClick={() => setTab('admin-vips')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${
+                  tab === 'admin-vips'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                }`}
+              >
+                VIP ({adminVips.length})
+              </button>
             </div>
 
             {tab === 'members' && (
@@ -595,7 +708,7 @@ export default function Admin() {
                   >
                     {u.vipRequest?.status === 'pending' ? (
                       <span className="text-amber-400 text-[10px] font-bold shrink-0 px-2">
-                        Aguarda Chef
+                        Aguarda Proprietário
                       </span>
                     ) : (
                       <button
@@ -603,6 +716,31 @@ export default function Admin() {
                         className="flex items-center gap-1 px-3 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg text-white text-xs font-bold transition-colors shrink-0"
                       >
                         <Send className="w-3.5 h-3.5" /> Solicitar VIP
+                      </button>
+                    )}
+                  </UserCard>
+                ))}
+              </Section>
+            )}
+
+            {tab === 'admin-vips' && (
+              <Section
+                title="Solicitar exoneração VIP"
+                empty="Nenhum VIP disponível"
+                count={adminVips.length}
+              >
+                {adminVips.map((u) => (
+                  <UserCard key={u.id} user={u} badge="VIP">
+                    {u.vipRevocationRequest?.status === 'pending' ? (
+                      <span className="text-amber-400 text-[10px] font-bold shrink-0 px-2 text-right">
+                        Pedido enviado
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => requestVipRevocation(u.id, u.name)}
+                        className="flex items-center gap-1 px-3 py-2 bg-red-600/90 hover:bg-red-600 rounded-lg text-white text-xs font-bold transition-colors shrink-0"
+                      >
+                        <X className="w-3.5 h-3.5" /> Solicitar exoneração
                       </button>
                     )}
                   </UserCard>
@@ -653,7 +791,7 @@ function AccountRow({ user, children, compact = false }) {
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-white font-bold text-sm">{user.name}</p>
             <span className="text-[9px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded font-bold">
-              {ROLE_LABEL[user.role] || user.role}
+              {ROLE_LABEL[user.role] || getRoleLabel(user.role)}
             </span>
             <ActivityBadge activity={user.activity} />
           </div>

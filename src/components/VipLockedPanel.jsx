@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Lock, Crown, Clock } from 'lucide-react';
+import WhatsAppGroupCard from './WhatsAppGroupCard';
 
 export function VipStatusBanner({ user, compact = false }) {
   const pending = user?.vipRequest?.status === 'pending';
@@ -33,15 +34,15 @@ export function VipStatusBanner({ user, compact = false }) {
           </p>
           <p className="text-zinc-400 text-xs mt-1 leading-relaxed">
             {pending
-              ? 'O Chef Máximo irá confirmar o teu acesso aos robôs dos casinos em breve.'
+              ? 'O Proprietário irá confirmar o teu acesso aos robôs dos casinos em breve.'
               : 'Explora o site normalmente. Os robôs de sinais só ficam disponíveis após aprovação VIP.'}
           </p>
           {!compact && (
             <Link
-              to="/Profile"
-              className="inline-block mt-2 text-cyan-400 text-xs font-bold hover:underline"
+              to="/Support"
+              className="inline-block mt-2 text-emerald-400 text-xs font-bold hover:underline"
             >
-              Ver estado no perfil →
+              Suporte WhatsApp →
             </Link>
           )}
         </div>
@@ -59,13 +60,22 @@ export default function VipLockedPanel({ title = 'Robôs dos casinos' }) {
       <div>
         <p className="text-white font-black text-sm uppercase tracking-wide">{title}</p>
         <p className="text-zinc-500 text-xs mt-2 max-w-xs mx-auto leading-relaxed">
-          Área exclusiva VIP. Após o Chef Máximo aprovar a tua conta, terás acesso completo aos
+          Área exclusiva VIP. Após o Proprietário aprovar a tua conta, terás acesso completo aos
           robôs e sinais ao vivo.
         </p>
       </div>
       <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-300 text-[10px] font-bold uppercase tracking-wider">
         <Lock className="w-3.5 h-3.5" />
         Aguarda verificação VIP
+      </div>
+      <div className="pt-2">
+        <WhatsAppGroupCard
+          compact
+          title="Precisas de ajuda ou VIP?"
+          description="Entra no grupo WhatsApp oficial para suporte e pedido de acesso VIP."
+          buttonLabel="Grupo WhatsApp — Sense Bot"
+          showHint={false}
+        />
       </div>
     </div>
   );

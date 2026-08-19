@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { LogIn, UserPlus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import SenseBotLogo from '../components/SenseBotLogo';
+import WhatsAppGroupCard from '../components/WhatsAppGroupCard';
 
 export default function Auth() {
   const location = useLocation();
@@ -204,10 +205,18 @@ export default function Auth() {
               >
                 {loading ? 'A registar...' : 'Criar conta / Registrar'}
               </button>
-              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 text-center">
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 text-center space-y-3">
                 <p className="text-amber-200 text-xs">
-                  Após registo, podes explorar o site. Os robôs ficam disponíveis quando o Chef Máximo aprovar a tua conta VIP.
+                  Após registo, entra no grupo WhatsApp para suporte e pedido VIP. O Proprietário
+                  aprova o acesso aos robôs.
                 </p>
+                <WhatsAppGroupCard
+                  compact
+                  showHint={false}
+                  title="Comunidade WhatsApp"
+                  description="Obrigatório para suporte e VIP."
+                  buttonLabel="Entrar no grupo WhatsApp"
+                />
               </div>
             </motion.form>
           )}

@@ -92,6 +92,7 @@ export function betToZone(bet) {
   if (s.includes('AZUL') || s.includes('JOGADOR') || s === 'PLAYER') return 'player';
   if (s.includes('VERMELHO') || s.includes('BANCA') || s.includes('CASA') || s === 'BANKER') return 'banker';
   if (s.includes('EMPATE') || s === 'TIE') return 'tie';
+  if (bet === 'player' || bet === 'banker' || bet === 'tie') return bet;
   if (bet === 'Player') return 'player';
   if (bet === 'Banker') return 'banker';
   if (bet === 'Tie') return 'tie';
@@ -146,13 +147,12 @@ export function getPredictedZone(signal, showMonitoring) {
   return null;
 }
 
-/** Entrada inicial (não é gale) + 3 gales após falha da entrada */
+/** 3 gales — só após falha da entrada inicial (entrada = cor PREVISÃO, não barra) */
 export const ENTRY_LABEL = 'ENTRADA';
 export const GALE_ONLY_LABELS = ['1° GALE', '2° GALE', '3° GALE'];
 export const MAX_GALE_ROUNDS = GALE_ONLY_LABELS.length;
 export const ATTEMPT_LABELS = [ENTRY_LABEL, ...GALE_ONLY_LABELS];
 export const TOTAL_ATTEMPTS = ATTEMPT_LABELS.length;
-/** @deprecated */
 export const TOTAL_GALE_ATTEMPTS = TOTAL_ATTEMPTS;
 export const GALE_ROUNDS = MAX_GALE_ROUNDS;
 
@@ -221,42 +221,35 @@ export function getColorConfig(zone) {
   return BACBO_COLORS[zone] || null;
 }
 
-/** Entrada separada + 3 barras de gale (só após falha da entrada) */
+/** Só barras de gale — inactivas na entrada; 1° gale após falha da entrada */
 export function getGaleProgress(signal) {
-  if (!signal || !['confirmed', 'gale_update', 'result'].includes(signal.signal_status)) {
+  if (!signal) return null;
+
+  const status = signal.signal_status;
+  if (!['confirmed', 'gale_update', 'result'].includes(status)) {
     return null;
   }
 
   const apiGale = Number(signal.current_gale) || 0;
   const galeIdx = apiToGaleBarIndex(apiGale);
-
-  let entryState = 'pending';
   const galeStates = GALE_ONLY_LABELS.map(() => 'pending');
 
-  if (signal.signal_status === 'confirmed') {
-    entryState = 'active';
-  } else if (signal.signal_status === 'gale_update') {
-    entryState = 'done';
+  if (status === 'confirmed') {
+    // Entrada activa — gales sem reacção
+  } else if (status === 'gale_update') {
     if (galeIdx >= 0) {
       galeStates[galeIdx] = 'active';
       for (let i = 0; i < galeIdx; i++) galeStates[i] = 'done';
     }
-  } else if (signal.signal_status === 'result') {
+  } else if (status === 'result') {
     const isGreen = signal.result === 'green';
-
-    if (apiGale === 0) {
-      entryState = isGreen ? 'done' : 'failed';
-    } else {
-      entryState = 'done';
-      if (galeIdx >= 0) {
-        for (let i = 0; i < galeIdx; i++) galeStates[i] = 'done';
-        galeStates[galeIdx] = isGreen ? 'done' : 'failed';
-      }
+    if (galeIdx >= 0) {
+      for (let i = 0; i < galeIdx; i++) galeStates[i] = 'done';
+      galeStates[galeIdx] = isGreen ? 'done' : 'failed';
     }
   }
 
   return {
-    entry: { label: ENTRY_LABEL, state: entryState },
     gales: GALE_ONLY_LABELS.map((label, i) => ({ label, state: galeStates[i] })),
     show: true,
   };

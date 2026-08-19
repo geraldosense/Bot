@@ -104,9 +104,10 @@ export function mapScoreboardRow(row, gameId = GAME_ID) {
 function mapBetRecommendation(rec) {
   if (!rec) return null;
   const s = String(rec).toUpperCase();
-  if (s.includes('AZUL') || s.includes('JOGADOR')) return 'Player';
-  if (s.includes('VERMELHO') || s.includes('BANCA') || s.includes('CASA')) return 'Banker';
-  if (s.includes('EMPATE') || s.includes('TIE')) return 'Tie';
+  if (s.includes('AZUL') || s.includes('JOGADOR') || s === 'PLAYER') return 'Player';
+  if (s.includes('VERMELHO') || s.includes('BANCA') || s.includes('CASA') || s === 'BANKER') return 'Banker';
+  if (s.includes('EMPATE') || s === 'TIE') return 'Tie';
+  if (rec === 'Player' || rec === 'Banker' || rec === 'Tie') return rec;
   return null;
 }
 

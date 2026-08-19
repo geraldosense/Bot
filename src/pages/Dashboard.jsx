@@ -9,6 +9,7 @@ import SenseBotLogo from '../components/SenseBotLogo';
 import GameCard from '../components/GameCard';
 import DailyScoreboardPanel from '../components/DailyScoreboardPanel';
 import VipLockedPanel, { VipStatusBanner } from '../components/VipLockedPanel';
+import WhatsAppGroupCard from '../components/WhatsAppGroupCard';
 import { useAuth } from '../context/AuthContext';
 import { normalizeScoreboard, formatWinRate } from '../utils/scoreboard';
 
@@ -122,6 +123,15 @@ export default function Dashboard() {
 
       <div className="max-w-4xl mx-auto px-4 py-4 space-y-4">
         {!isVip && <VipStatusBanner user={user} />}
+        {!isVip && (
+          <WhatsAppGroupCard
+            compact
+            showHint={false}
+            title="Grupo WhatsApp oficial"
+            description="Suporte, avisos e pedido de acesso VIP."
+            buttonLabel="Entrar no grupo WhatsApp"
+          />
+        )}
 
         <DailyScoreboardPanel
           scoreboard={displayScoreboard}

@@ -55,7 +55,7 @@ function NavItem({ to, icon: Icon, label, active, accent = 'emerald', badge }) {
               VIP
             </span>
           )}
-          {badge === 'chef' && (
+          {badge === 'owner' && (
             <span className="absolute -top-2 -right-3 flex items-center justify-center w-4 h-4 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 shadow-[0_2px_8px_rgba(251,191,36,0.5)]">
               <Crown className="w-2.5 h-2.5 text-black" strokeWidth={2.5} />
             </span>
@@ -100,9 +100,9 @@ export default function BottomNav() {
     tabs.push({
       path: '/Admin',
       icon: Shield,
-      label: isSuperAdmin ? 'Chef' : 'Admin',
+      label: isSuperAdmin ? 'Proprietário' : 'Admin',
       accent: 'purple',
-      badge: isSuperAdmin ? 'chef' : null,
+      badge: isSuperAdmin ? 'owner' : null,
     });
   }
 

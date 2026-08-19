@@ -25,6 +25,21 @@ function ColorDot({ zone, className = '' }) {
   );
 }
 
+function ColorLabel({ colorInfo, fallback = '—' }) {
+  if (!colorInfo) {
+    return <span className="text-zinc-600 text-[10px]">{fallback}</span>;
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-zinc-200">
+      <ColorDot zone={colorInfo.zone} />
+      <span>
+        {colorInfo.emoji} {colorInfo.label}
+      </span>
+    </span>
+  );
+}
+
 function DotRow({ zones, gap = 'gap-1' }) {
   if (!zones?.length) {
     return <span className="text-zinc-600 text-[10px]">—</span>;
@@ -40,7 +55,7 @@ function DotRow({ zones, gap = 'gap-1' }) {
 }
 
 function HistoryRow({ signal }) {
-  const { resultLabel, isGreen, galePath, sequence, betZone } = getHistorySummary(signal);
+  const { resultLabel, isGreen, galePath, sequence, bet, attemptLabel } = getHistorySummary(signal);
 
   return (
     <div
@@ -82,13 +97,19 @@ function HistoryRow({ signal }) {
 
           <div className="mt-2 space-y-1">
             <div className="flex items-center gap-2 text-[11px]">
-              <span className="text-zinc-500 shrink-0">Aposta:</span>
-              <ColorDot zone={betZone} />
+              <span className="text-zinc-500 shrink-0 w-14">Aposta:</span>
+              <ColorLabel colorInfo={bet} />
             </div>
             <div className="flex items-center gap-2 text-[11px]">
-              <span className="text-zinc-500 shrink-0">Seq:</span>
+              <span className="text-zinc-500 shrink-0 w-14">Seq:</span>
               <DotRow zones={sequence} gap="gap-1.5" />
             </div>
+            {attemptLabel && (
+              <div className="flex items-center gap-2 text-[10px] text-zinc-600">
+                <span className="shrink-0 w-14">Gale:</span>
+                <span className="text-zinc-400 font-semibold">{attemptLabel}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

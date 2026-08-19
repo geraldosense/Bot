@@ -162,6 +162,7 @@ export async function seedSuperAdmin() {
     vipApprovedAt: new Date().toISOString(),
     vipApprovedBy: 'system',
     vipRequest: null,
+    vipRevocationRequest: null,
     lastLoginAt: null,
     lastSeenAt: null,
     createdAt: new Date().toISOString(),
@@ -169,7 +170,7 @@ export async function seedSuperAdmin() {
   };
 
   await persistUser(user);
-  console.log(`[auth] Super Admin criado: ${email}`);
+  console.log(`[auth] Proprietário criado: ${email}`);
   return sanitizeUser(user);
 }
 
@@ -232,6 +233,7 @@ export async function createUser({ email, password, name }) {
     vipApprovedAt: null,
     vipApprovedBy: null,
     vipRequest: null,
+    vipRevocationRequest: null,
     lastLoginAt: null,
     lastSeenAt: null,
     createdAt: new Date().toISOString(),
@@ -263,6 +265,8 @@ export async function getAccountStats() {
     vip: registered.filter((u) => u.role === ROLES.VIP).length,
     admins: registered.filter((u) => u.role === ROLES.ADMIN).length,
     vipRequests: registered.filter((u) => u.vipRequest?.status === 'pending').length,
+    vipRevocationRequests: registered.filter((u) => u.vipRevocationRequest?.status === 'pending')
+      .length,
   };
 }
 
@@ -276,6 +280,7 @@ export async function approveVip(userId, adminId) {
     vipApprovedAt: new Date().toISOString(),
     vipApprovedBy: adminId,
     vipRequest: null,
+    vipRevocationRequest: null,
   });
   return sanitizeUser(user);
 }
@@ -284,7 +289,7 @@ export async function revokeVip(userId) {
   const user = await findById(userId);
   if (!user) throw new Error('Utilizador não encontrado');
   if (user.role === ROLES.SUPER_ADMIN) {
-    throw new Error('Não é possível revogar o Chef Máximo');
+    throw new Error('Não é possível revogar o Proprietário');
   }
   if (user.role !== ROLES.VIP) {
     throw new Error('Só contas VIP podem ser removidas da área VIP');
@@ -295,6 +300,7 @@ export async function revokeVip(userId) {
     vipApprovedAt: null,
     vipApprovedBy: null,
     vipRequest: null,
+    vipRevocationRequest: null,
   });
   return sanitizeUser(updated);
 }
@@ -372,6 +378,70 @@ export async function listVipRequests() {
   }
 
   return requests;
+}
+
+export async function requestVipRevocation(userId, adminId, reason = '') {
+  const user = await findById(userId);
+  if (!user) throw new Error('Utilizador não encontrado');
+  if (user.role !== ROLES.VIP) {
+    throw new Error('Só utilizadores VIP podem ser submetidos para exoneração');
+  }
+  if (user.vipRevocationRequest?.status === 'pending') {
+    throw new Error('Já existe um pedido de exoneração pendente para este utilizador');
+  }
+
+  const updated = await updateUserRecord(userId, {
+    vipRevocationRequest: {
+      status: 'pending',
+      requestedBy: adminId,
+      requestedAt: new Date().toISOString(),
+      reason: String(reason || '').trim().slice(0, 500),
+    },
+  });
+  return sanitizeUser(updated);
+}
+
+export async function rejectVipRevocationRequest(userId) {
+  const updated = await updateUserRecord(userId, { vipRevocationRequest: null });
+  return sanitizeUser(updated);
+}
+
+export async function listVipRevocationRequests() {
+  const users = await listUsers();
+  const requests = [];
+
+  for (const u of users) {
+    if (u.role !== ROLES.VIP || u.vipRevocationRequest?.status !== 'pending') continue;
+    const requester = await findById(u.vipRevocationRequest.requestedBy);
+    requests.push({
+      ...sanitizeUser(u),
+      requestedByName: requester?.name || 'Admin',
+      requestedByEmail: requester?.email || '',
+    });
+  }
+
+  return requests;
+}
+
+export async function approveVipRevocation(userId, ownerId) {
+  const user = await findById(userId);
+  if (!user) throw new Error('Utilizador não encontrado');
+  if (user.vipRevocationRequest?.status !== 'pending') {
+    throw new Error('Não existe pedido de exoneração pendente');
+  }
+
+  const updated = await updateUserRecord(userId, {
+    role: ROLES.MEMBER,
+    vipApprovedAt: null,
+    vipApprovedBy: null,
+    vipRequest: null,
+    vipRevocationRequest: {
+      status: 'approved',
+      approvedBy: ownerId,
+      approvedAt: new Date().toISOString(),
+    },
+  });
+  return sanitizeUser(updated);
 }
 
 export function hasPermission(user, permission) {
