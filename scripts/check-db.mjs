@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 /** Verifica ligação à tabela sense_bot_users no Supabase */
+import { loadEnv } from './load-env.mjs';
 import { pingUsersTable, sbListUsers } from '../server/auth/supabaseClient.js';
+
+loadEnv();
 import { initUserStore, getStorageMode } from '../server/auth/userStore.js';
 
 const ping = await pingUsersTable();

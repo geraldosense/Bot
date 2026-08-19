@@ -6,7 +6,10 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { loadEnv } from './load-env.mjs';
 import { pingUsersTable, sbListUsers, sbUpsertUsers } from '../server/auth/supabaseClient.js';
+
+loadEnv();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const USERS_FILE = path.join(__dirname, '../server/data/users.json');

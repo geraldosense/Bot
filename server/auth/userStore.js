@@ -95,6 +95,12 @@ export async function initUserStore() {
       '[auth] AVISO: Tabela sense_bot_users não existe no Supabase. A usar ficheiro local (dados perdem-se no Render).',
     );
     console.warn('[auth] Executa supabase/sense_bot_users.sql no SQL Editor do Supabase.');
+    console.warn('[auth] Ou corre: npm run db:setup');
+  } else if (ping.reason === 'missing_key' || ping.reason === 'invalid_key') {
+    console.warn(
+      '[auth] AVISO: SUPABASE_SERVICE_ROLE_KEY em falta ou inválida. A usar ficheiro local.',
+    );
+    console.warn('[auth] Define a chave service_role no Render → Environment.');
   } else {
     console.warn(`[auth] Supabase indisponível (${ping.reason}) — a usar ficheiro local`);
   }

@@ -1,9 +1,22 @@
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://btyescbddoopbbuacyhd.supabase.co';
-const SUPABASE_SERVICE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.SUPABASE_SERVICE_KEY ||
-  process.env.SUPABASE_KEY ||
-  'sb_publishable_eqZiBte_sQPi_YQQpGpl0w_7aMhJjgr';
+
+function resolveServiceKey() {
+  return (
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_KEY ||
+    process.env.SUPABASE_KEY ||
+    ''
+  );
+}
+
+function isValidServiceKey(key) {
+  if (!key) return false;
+  // Nunca usar chave anon/publishable para CRUD de contas
+  if (key.startsWith('sb_publishable_')) return false;
+  return true;
+}
+
+const SUPABASE_SERVICE_KEY = resolveServiceKey();
 
 const TABLE = 'sense_bot_users';
 
@@ -17,11 +30,15 @@ function headers(extra = {}) {
 }
 
 export function isSupabaseConfigured() {
-  return Boolean(SUPABASE_URL && SUPABASE_SERVICE_KEY);
+  return Boolean(SUPABASE_URL && isValidServiceKey(SUPABASE_SERVICE_KEY));
 }
 
 export async function pingUsersTable() {
-  if (!isSupabaseConfigured()) return { ok: false, reason: 'missing_config' };
+  if (!SUPABASE_URL) return { ok: false, reason: 'missing_url' };
+  if (!SUPABASE_SERVICE_KEY) return { ok: false, reason: 'missing_key' };
+  if (!isValidServiceKey(SUPABASE_SERVICE_KEY)) {
+    return { ok: false, reason: 'invalid_key', detail: 'Use service_role, not publishable/anon' };
+  }
 
   try {
     const res = await fetch(

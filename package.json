@@ -16,6 +16,7 @@
     "go-live": "node scripts/go-live.mjs",
     "go-live:dev": "node scripts/go-live-dev.mjs",
     "db:check": "node scripts/check-db.mjs",
+    "db:setup": "node scripts/setup-supabase.mjs",
     "db:import": "node scripts/import-users.mjs",
     "preview": "vite preview --host"
   },
