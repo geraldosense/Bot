@@ -12,9 +12,10 @@ async function fetchWithTimeout(url, options = {}, ms = 10000) {
 }
 
 export async function fetchJson(path, options = {}) {
+  const { timeout = 10000, ...fetchOptions } = options;
   let res;
   try {
-    res = await fetchWithTimeout(path, options);
+    res = await fetchWithTimeout(path, fetchOptions, timeout);
   } catch {
     throw new Error(
       'Servidor indisponível. Inicia o backend com: npm run dev:server (ou npm run dev)'

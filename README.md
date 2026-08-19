@@ -1,123 +1,58 @@
-# Sense Bot — Bac Bo
+# Sense Bot
 
-Robô de análise Bac Bo em tempo real com sinais, placar diário, catalogador e dashboard VIP.
-https://sense-bot-f2yw.onrender.com/login
+Plataforma desenvolvida por **Geraldo Sense** — um robô de inteligência artificial que analisa mesas ao vivo e ajuda a identificar **valores, padrões e oportunidades** no Bac Bo com sinais claros, placar diário e gestão profissional de contas VIP.
 
-## Funcionalidades
+---
 
-- **Robô de análise** — 5 estratégias: reversão de streak, momentum, alternância, pós-empate, underdog
-- **Sinais em tempo real** — estados: analyzing → confirmed → gale → result
-- **Catalogador** — grid visual com histórico Player/Banker/Tie
-- **Dashboard** — placar, win rate, seleção de jogos
-- **WebSocket** — atualizações instantâneas
-- **Proteções** — gale automático e cobertura de empate
+## O que é
 
-## Instalação
+O **Sense Bot** combina análise em tempo real, histórico de jogadas e sinais com estratégia de gales. Foi criado para quem quer acompanhar o jogo com método, disciplina e ferramentas visuais — não adivinhação.
+
+**Principais capacidades:**
+
+- Robô de análise Bac Bo com sinais ao vivo  
+- Placar diário e taxa de acerto  
+- Catalogador visual de resultados  
+- Área VIP com aprovação pelo Chef Máximo  
+- Painel admin com total de registos e emails  
+
+---
+
+## Acesso VIP
+
+1. Registo no site  
+2. Exploração da plataforma (área pública)  
+3. Aprovação VIP pelo **Chef Máximo**  
+4. Acesso completo aos robôs e sinais  
+
+| Perfil | Acesso |
+|--------|--------|
+| Membro | Site, perfil e suporte |
+| VIP | Robôs e sinais ao vivo |
+| Admin | Solicita VIP (Chef aprova) |
+| Chef Máximo | Controlo total e lista de registados |
+
+---
+
+## Desenvolvimento local
 
 ```bash
 npm install
 npm run dev
 ```
 
-- Frontend: http://localhost:5173
-- Backend + WebSocket: http://localhost:3001
-
-## Publicar na internet (qualquer telemóvel)
-
-O site **não funciona** só com Vercel (`*.vercel.app`) — falta o servidor Node.js e WebSocket.
-
-**Guia completo:** [DEPLOY.md](./DEPLOY.md)
-
-Resumo rápido:
-1. Push do código para GitHub
-2. [Render.com](https://render.com) → **New → Blueprint** → repo `geraldosense/Bot`
-3. Define `SUPER_ADMIN_EMAIL` e `SUPER_ADMIN_PASSWORD`
-4. Partilha o URL `https://sense-bot-xxxx.onrender.com` no WhatsApp
-
-## Go Live / Produção local
+Produção local:
 
 ```bash
 npm run go-live
 ```
 
-Abre tudo em **http://localhost:3001** (build + servidor + WebSocket no mesmo URL).
+---
 
-Alternativa manual:
+## Site online
 
-```bash
-npm run build
-npm start
-```
+**https://sense-bot-f2yw.onrender.com**
 
-Dev com browser automático:
+---
 
-```bash
-npm run go-live:dev
-```
-
-## Autenticação e VIP
-
-1. **Login** → `/login` (primeira página ao entrar no site)
-2. **Registo** → `/register` (aderir com email)
-3. **Aguardar aprovação** → admin aprova VIP manualmente
-4. **Acesso IA** → só utilizadores VIP+ veem sinais
-
-### Hierarquia
-
-| Role | Permissões |
-|------|------------|
-| **member** | Conta criada, sem acesso IA |
-| **vip** | Sinais + Perfil + Suporte |
-| **admin** | + aprovar VIP (se autorizado) + ver IA activa |
-| **super_admin** | Chef Máximo — gere admins e todas permissões |
-
-### Chef Máximo (primeiro arranque)
-
-Variáveis de ambiente (recomendado alterar):
-
-```bash
-SUPER_ADMIN_EMAIL=teu@email.com
-SUPER_ADMIN_PASSWORD=tua_password_segura
-JWT_SECRET=chave-secreta-longa
-```
-
-Por defeito na primeira execução: `senseoliveira6@gmail.com` / `12sense12`
-
-### Painel Admin
-
-- `/Admin` — aprovar emails para VIP
-- Ver **quantos utilizadores estão a usar a IA** em tempo real
-- Chef Máximo pode promover admins e definir quem pode aprovar VIP
-
-## Configuração casino
-
-Variáveis de ambiente opcionais:
-
-| Variável | Default | Descrição |
-|----------|---------|-----------|
-| `PORT` | 3001 | Porta do servidor |
-| `SUPABASE_URL` | — | URL Supabase dos rounds Evolution Bac Bo |
-| `SUPABASE_KEY` | — | Chave API do casino |
-| `BACBO_GAME_ID` | bac_bo | ID do jogo na base de dados |
-
-## Estratégias do Robô
-
-1. **Streak Reversal** — após 3+ resultados iguais, aposta na reversão
-2. **Momentum** — segue tendência quando 65%+ nos últimos 15 rounds
-3. **Alternation** — detecta padrão zig-zag e continua
-4. **Post Tie** — após empate, segue tendência imediata
-5. **Underdog** — aposta no lado menos frequente com desequilíbrio ≥6
-
-## Estrutura
-
-```
-server/
-  analyzer.js           — motor de análise
-  signalEngine.js       — gestão de sinais e gales
-  casinoDataProvider.js — dados Evolution via Supabase
-  scoreboardStore.js    — placar diário persistente
-  index.js              — Express + WebSocket
-src/
-  pages/                — Dashboard, BacBo, Auth, Admin
-  components/           — UI de sinais, catalogador, mesa
-```
+*Geraldo Sense — Sense Bot © 2026*

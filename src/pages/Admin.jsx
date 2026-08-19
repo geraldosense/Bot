@@ -14,6 +14,7 @@ import {
   Mail,
   BarChart3,
   Circle,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuth, authHeaders } from '../context/AuthContext';
 import BottomNav from '../components/BottomNav';
@@ -71,14 +72,16 @@ export default function Admin() {
   const [vipRequests, setVipRequests] = useState([]);
   const [members, setMembers] = useState([]);
   const [iaActive, setIaActive] = useState([]);
-  const [tab, setTab] = useState('overview');
+  const [tab, setTab] = useState('vip-requests');
   const [search, setSearch] = useState('');
   const [msg, setMsg] = useState('');
   const [loadError, setLoadError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [storageMode, setStorageMode] = useState(null);
 
   useEffect(() => {
     if (authLoading) return;
-    setTab(isSuperAdmin ? 'overview' : 'members');
+    setTab(isSuperAdmin ? 'vip-requests' : 'members');
   }, [isSuperAdmin, authLoading]);
 
   const buildStatsFromUsers = (list, iaList = [], iaConnections = 0) => {
@@ -98,15 +101,18 @@ export default function Admin() {
   const load = async () => {
     if (!token || authLoading) return;
     try {
+      setLoading(true);
       setLoadError('');
+      const opts = { headers: authHeaders(token), timeout: 25000 };
+
       if (isSuperAdmin) {
         let overview = null;
         try {
-          overview = await fetchJson('/api/admin/overview', { headers: authHeaders(token) });
+          overview = await fetchJson('/api/admin/overview', opts);
         } catch {
           const [usersData, activeData] = await Promise.all([
-            fetchJson('/api/admin/users', { headers: authHeaders(token) }),
-            fetchJson('/api/admin/active-users', { headers: authHeaders(token) }).catch(() => null),
+            fetchJson('/api/admin/users', opts),
+            fetchJson('/api/admin/active-users', opts).catch(() => null),
           ]);
           const list = (usersData.users || []).filter((u) => u.role !== 'super_admin');
           overview = {
@@ -117,15 +123,17 @@ export default function Admin() {
               activeData?.totalConnections || 0,
             ),
             iaActive: activeData?.users || [],
+            storage: 'unknown',
           };
         }
 
         setUsers(overview.users || []);
         setStats(overview.stats || null);
         setIaActive(overview.iaActive || []);
+        setStorageMode(overview.storage || null);
 
         try {
-          const requests = await fetchJson('/api/admin/vip-requests', { headers: authHeaders(token) });
+          const requests = await fetchJson('/api/admin/vip-requests', opts);
           setVipRequests(requests.requests || []);
         } catch {
           setVipRequests([]);
@@ -156,6 +164,8 @@ export default function Admin() {
       }
     } catch (err) {
       setLoadError(err.message || 'Erro ao carregar dados do painel');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -264,22 +274,33 @@ export default function Admin() {
     <div className="min-h-screen pb-28 bg-zinc-950">
       <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
         <div className="flex items-center justify-between gap-3">
-          <div>
+          <div className="min-w-0">
             <h1 className="text-xl font-black text-white flex items-center gap-2">
-              <Shield className="w-6 h-6 text-purple-400" />
+              <Shield className="w-6 h-6 text-purple-400 shrink-0" />
               {isSuperAdmin ? 'Centro de Controlo' : 'Painel Admin'}
             </h1>
             <p className="text-zinc-500 text-xs mt-1">
               {isSuperAdmin
-                ? 'Aprova, remove VIP e gere todas as contas'
+                ? 'Todos os registos, emails e utilização da IA'
                 : 'Solicita VIP — o Chef Máximo aprova'}
             </p>
           </div>
-          {isSuperAdmin && (
-            <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2.5 py-1 rounded-full font-bold shrink-0">
-              👑 CHEF MÁXIMO
-            </span>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={load}
+              disabled={loading}
+              className="p-2 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-white disabled:opacity-50"
+              aria-label="Actualizar"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+            {isSuperAdmin && (
+              <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2.5 py-1 rounded-full font-bold">
+                👑 CHEF
+              </span>
+            )}
+          </div>
         </div>
 
         {loadError && (
@@ -292,6 +313,70 @@ export default function Admin() {
           <p className="text-emerald-400 text-xs text-center bg-emerald-500/10 border border-emerald-500/20 py-2.5 rounded-lg">
             {msg}
           </p>
+        )}
+
+        {isSuperAdmin && storageMode === 'file' && (
+          <p className="text-amber-300 text-xs bg-amber-500/10 border border-amber-500/25 py-2.5 px-3 rounded-lg">
+            Base de dados temporária — configura Supabase para guardar registos permanentemente.
+          </p>
+        )}
+
+        {isSuperAdmin && (
+          <div className="rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-900/40 to-zinc-900 p-4 text-center">
+            <p className="text-zinc-400 text-xs font-bold uppercase tracking-wider">
+              Pessoas registadas no site
+            </p>
+            <p className="text-5xl font-black text-white mt-1">
+              {loading && users.length === 0 ? '…' : stats?.total ?? users.length}
+            </p>
+            <p className="text-zinc-500 text-xs mt-1">
+              emails únicos · actualiza a cada 10 segundos
+            </p>
+          </div>
+        )}
+
+        {isSuperAdmin && (
+          <>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Pesquisar nome ou email..."
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-purple-500/50"
+              />
+            </div>
+
+            <Section
+              title="Todos os registados"
+              empty={loading ? 'A carregar contas…' : 'Ainda ninguém se registou'}
+              count={filteredUsers.length}
+            >
+              {filteredUsers.map((u) => (
+                <AccountRow key={u.id} user={u} compact>
+                  <div className="flex flex-col gap-1.5 shrink-0">
+                    {u.role === 'member' && (
+                      <button
+                        onClick={() => approve(u.id)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white text-[10px] font-bold transition-colors"
+                      >
+                        <Crown className="w-3 h-3" /> Dar VIP
+                      </button>
+                    )}
+                    {u.role === 'vip' && (
+                      <button
+                        onClick={() => revoke(u.id, u.name)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 bg-red-600/90 hover:bg-red-600 rounded-lg text-white text-[10px] font-bold transition-colors"
+                      >
+                        <X className="w-3 h-3" /> Remover VIP
+                      </button>
+                    )}
+                  </div>
+                </AccountRow>
+              ))}
+            </Section>
+          </>
         )}
 
         {isSuperAdmin && stats && (
@@ -347,20 +432,8 @@ export default function Admin() {
 
         {isSuperAdmin && (
           <>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-              <input
-                type="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Pesquisar nome ou email..."
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-purple-500/50"
-              />
-            </div>
-
             <div className="flex gap-2 overflow-x-auto pb-1">
               {[
-                { id: 'overview', label: `Contas (${users.length})` },
                 { id: 'vip-requests', label: `Pedidos (${vipRequests.length})` },
                 { id: 'pending', label: `Membros (${pending.length})` },
                 { id: 'vip', label: `VIP (${vips.length})` },
@@ -379,37 +452,6 @@ export default function Admin() {
                 </button>
               ))}
             </div>
-
-            {tab === 'overview' && (
-              <Section
-                title="Todas as contas e emails"
-                empty="Nenhuma conta registada"
-                count={filteredUsers.length}
-              >
-                {filteredUsers.map((u) => (
-                  <AccountRow key={u.id} user={u}>
-                    <div className="flex flex-col gap-1.5 shrink-0">
-                      {u.role === 'member' && (
-                        <button
-                          onClick={() => approve(u.id)}
-                          className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white text-[10px] font-bold transition-colors"
-                        >
-                          <Crown className="w-3 h-3" /> Dar VIP
-                        </button>
-                      )}
-                      {u.role === 'vip' && (
-                        <button
-                          onClick={() => revoke(u.id, u.name)}
-                          className="flex items-center gap-1 px-2.5 py-1.5 bg-red-600/90 hover:bg-red-600 rounded-lg text-white text-[10px] font-bold transition-colors"
-                        >
-                          <X className="w-3 h-3" /> Remover VIP
-                        </button>
-                      )}
-                    </div>
-                  </AccountRow>
-                ))}
-              </Section>
-            )}
 
             {tab === 'vip-requests' && (
               <Section
@@ -603,7 +645,7 @@ function Section({ title, empty, count, children }) {
   );
 }
 
-function AccountRow({ user, children }) {
+function AccountRow({ user, children, compact = false }) {
   return (
     <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-3 space-y-2">
       <div className="flex items-start justify-between gap-3">
@@ -615,35 +657,42 @@ function AccountRow({ user, children }) {
             </span>
             <ActivityBadge activity={user.activity} />
           </div>
-          <p className="text-cyan-400/90 text-xs mt-1 flex items-center gap-1.5 break-all">
-            <Mail className="w-3.5 h-3.5 shrink-0" />
+          <p className="text-cyan-400 text-sm mt-1.5 font-medium flex items-start gap-1.5 break-all leading-snug">
+            <Mail className="w-4 h-4 shrink-0 mt-0.5" />
             {user.email}
           </p>
         </div>
         {children}
       </div>
-      <div className="grid grid-cols-2 gap-2 text-[10px] text-zinc-500 pt-1 border-t border-zinc-800/80">
-        <div>
-          <p className="text-zinc-600 uppercase font-bold tracking-wide">Registado</p>
-          <p className="text-zinc-400">{formatDateTime(user.createdAt)}</p>
+      {!compact && (
+        <div className="grid grid-cols-2 gap-2 text-[10px] text-zinc-500 pt-1 border-t border-zinc-800/80">
+          <div>
+            <p className="text-zinc-600 uppercase font-bold tracking-wide">Registado</p>
+            <p className="text-zinc-400">{formatDateTime(user.createdAt)}</p>
+          </div>
+          <div>
+            <p className="text-zinc-600 uppercase font-bold tracking-wide">Último login</p>
+            <p className="text-zinc-400">{formatDateTime(user.activity?.lastLoginAt || user.lastLoginAt)}</p>
+          </div>
+          <div>
+            <p className="text-zinc-600 uppercase font-bold tracking-wide">Última actividade</p>
+            <p className="text-zinc-400">{formatDateTime(user.activity?.lastSeenAt || user.lastSeenAt)}</p>
+          </div>
+          <div>
+            <p className="text-zinc-600 uppercase font-bold tracking-wide">Estado IA</p>
+            <p className={user.activity?.usingIa ? 'text-emerald-400 font-bold' : 'text-zinc-500'}>
+              {user.activity?.usingIa
+                ? `${user.activity.iaConnections} ligação(ões)`
+                : 'Não activo'}
+            </p>
+          </div>
         </div>
-        <div>
-          <p className="text-zinc-600 uppercase font-bold tracking-wide">Último login</p>
-          <p className="text-zinc-400">{formatDateTime(user.activity?.lastLoginAt)}</p>
-        </div>
-        <div>
-          <p className="text-zinc-600 uppercase font-bold tracking-wide">Última actividade</p>
-          <p className="text-zinc-400">{formatDateTime(user.activity?.lastSeenAt)}</p>
-        </div>
-        <div>
-          <p className="text-zinc-600 uppercase font-bold tracking-wide">Estado IA</p>
-          <p className={user.activity?.usingIa ? 'text-emerald-400 font-bold' : 'text-zinc-500'}>
-            {user.activity?.usingIa
-              ? `${user.activity.iaConnections} ligação(ões)`
-              : 'Não activo'}
-          </p>
-        </div>
-      </div>
+      )}
+      {compact && (
+        <p className="text-zinc-600 text-[10px] pt-1 border-t border-zinc-800/80">
+          Registado em {formatDateTime(user.createdAt)}
+        </p>
+      )}
     </div>
   );
 }

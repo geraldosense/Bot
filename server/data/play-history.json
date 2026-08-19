@@ -2998,13 +2998,61 @@
               "gale": 0,
               "maxGales": 0,
               "at": "2026-08-19T01:48:15.186846+00:00"
+            },
+            {
+              "id": "09ff2713-fe34-4c65-8984-86a484d636d3",
+              "result": "green",
+              "bet": null,
+              "gale": 0,
+              "maxGales": 0,
+              "at": "2026-08-19T01:53:04.814544+00:00"
+            },
+            {
+              "id": "0a9e5718-2866-4bf3-bcb7-65d2bbadf966",
+              "result": "green",
+              "bet": null,
+              "gale": 0,
+              "maxGales": 0,
+              "at": "2026-08-19T01:56:04.940084+00:00"
+            },
+            {
+              "id": "daf07a7a-609c-45e2-9a3e-17c81cedacaa",
+              "result": "green",
+              "bet": null,
+              "gale": 0,
+              "maxGales": 0,
+              "at": "2026-08-19T01:58:22.534473+00:00"
+            },
+            {
+              "id": "096ca8d0-7b9b-4838-b516-810b64bf38ba",
+              "result": "green",
+              "bet": null,
+              "gale": 0,
+              "maxGales": 0,
+              "at": "2026-08-19T02:04:09.232812+00:00"
+            },
+            {
+              "id": "e2d34e4b-fd49-49ef-b8b8-9b725fd68f7f",
+              "result": "green",
+              "bet": null,
+              "gale": 0,
+              "maxGales": 0,
+              "at": "2026-08-19T02:07:01.810364+00:00"
+            },
+            {
+              "id": "92dd17d5-8f58-4836-b02d-2b30d7985a1d",
+              "result": "green",
+              "bet": null,
+              "gale": 0,
+              "maxGales": 0,
+              "at": "2026-08-19T02:08:42.119108+00:00"
             }
           ],
           "casinoTotals": {
-            "greens": 355,
+            "greens": 361,
             "reds": 13,
-            "winRate": 96.47,
-            "syncedAt": "2026-08-19T01:48:16.180738+00:00"
+            "winRate": 96.52,
+            "syncedAt": "2026-08-19T02:08:43.152792+00:00"
           }
         }
       }
