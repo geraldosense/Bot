@@ -11,6 +11,10 @@ export function isSignalGreen(signal) {
 }
 
 export function getResultLabel(signal) {
+  return isSignalGreen(signal) ? 'GREEN' : 'RED';
+}
+
+export function getResultLabelPt(signal) {
   return isSignalGreen(signal) ? 'ACERTADO' : 'PERDIDO';
 }
 
@@ -144,8 +148,8 @@ export function getResultColorCaption(signal) {
   return isSignalGreen(signal) ? 'Cor acertada' : 'Cor que saiu';
 }
 
-/** Resultados reais da mesa durante a jogada (campo sequence do casino) */
-export function parseSequenceZones(signal, max = 3) {
+/** Todas as cores parseadas do campo sequence / casino */
+export function parseAllSequenceZones(signal) {
   const raw = signal?.sequence || signal?.actual_outcome || '';
   const zones = [];
 
@@ -154,15 +158,62 @@ export function parseSequenceZones(signal, max = 3) {
     if (zone) zones.push(zone);
   }
 
-  if (zones.length >= max) return zones.slice(-max);
+  return zones;
+}
+
+/** Resultados reais da mesa durante a jogada (campo sequence do casino) */
+export function parseSequenceZones(signal, max = 3) {
+  const all = parseAllSequenceZones(signal);
+  if (all.length >= max) return all.slice(-max);
 
   const tail = signal?.entry_condition || signal?.analysis?.entryCondition;
   if (tail) {
     const zone = matchZoneFromText(tail);
-    if (zone && zones[zones.length - 1] !== zone) zones.push(zone);
+    if (zone && all[all.length - 1] !== zone) all.push(zone);
   }
 
-  return zones.slice(-max);
+  return all.slice(-max);
+}
+
+/** Seq — padrão do casino antes / durante análise (últimas 3 cores reais) */
+export function getTriggerSequence(signal, max = 3) {
+  const all = parseAllSequenceZones(signal);
+  const attempts = Math.min(4, (Number(signal?.current_gale) || 0) + 1);
+
+  if (all.length > attempts) {
+    return all.slice(-(attempts + max), -attempts).slice(-max);
+  }
+
+  const fromCondition = parseSequenceZones({ sequence: signal?.entry_condition }, max);
+  if (fromCondition.length) return fromCondition;
+
+  return all.slice(0, max);
+}
+
+/** Cores que saíram na mesa em cada rodada da jogada (entrada + gales) */
+export function getPlayOutcomes(signal) {
+  const all = parseAllSequenceZones(signal);
+  const attempts = Math.min(4, (Number(signal?.current_gale) || 0) + 1);
+
+  if (all.length >= attempts) {
+    return all.slice(-attempts);
+  }
+
+  const bet = getSignalBetColor(signal)?.zone;
+  const outcome = getSignalOutcomeColor(signal)?.zone;
+  if (!bet && !outcome) return all;
+
+  const built = [];
+  for (let i = 0; i < attempts; i++) {
+    const isLast = i === attempts - 1;
+    if (isSignalGreen(signal)) {
+      built.push(isLast ? bet || outcome : outcome || bet);
+    } else {
+      built.push(isLast ? outcome || bet : bet || outcome);
+    }
+  }
+
+  return built.filter(Boolean);
 }
 
 /** Cores apostadas em cada tentativa (entrada + gales — mesma cor no martingale) */
@@ -175,26 +226,19 @@ export function getPlayBetAttempts(signal) {
   return Array.from({ length: attempts }, () => betZone);
 }
 
-/** Bolinhas ao lado do ACERTADO/PERDIDO — tentativas até ganhar/perder */
+/** Bolinhas ao lado do GREEN/RED — cores reais que saíram na mesa */
 export function getGalePathDots(signal) {
-  const betAttempts = getPlayBetAttempts(signal);
-  if (betAttempts.length) return betAttempts;
+  const play = getPlayOutcomes(signal);
+  if (play.length) return play;
 
-  const seq = parseSequenceZones(signal, 10);
   const bet = getSignalBetColor(signal)?.zone;
   const outcome = getSignalOutcomeColor(signal)?.zone;
-  const attempts = Math.min(3, (Number(signal?.current_gale) || 0) + 1);
-
-  if (seq.length >= attempts) return seq.slice(-attempts);
+  const attempts = Math.min(4, (Number(signal?.current_gale) || 0) + 1);
 
   const dots = [];
   for (let i = 0; i < attempts; i++) {
     const isLast = i === attempts - 1;
-    if (isSignalGreen(signal)) {
-      dots.push(bet || outcome);
-    } else {
-      dots.push(isLast ? outcome || bet : bet || outcome);
-    }
+    dots.push(isLast ? outcome || bet : bet || outcome);
   }
 
   return dots.filter(Boolean);
@@ -209,7 +253,8 @@ export function getHistorySummary(signal) {
   const galeLine = getGaleResultLine(signal);
   const isGreen = isSignalGreen(signal);
   const galePath = getGalePathDots(signal);
-  const sequence = parseSequenceZones(signal, 5);
+  const sequence = getTriggerSequence(signal, 3);
+  const playOutcomes = getPlayOutcomes(signal);
   const betAttempts = getPlayBetAttempts(signal);
 
   return {
@@ -224,6 +269,7 @@ export function getHistorySummary(signal) {
     colorCaption: getResultColorCaption(signal),
     galePath,
     sequence,
+    playOutcomes,
     betAttempts,
     betZone: bet?.zone || null,
     attemptLabel: formatAttemptLabel(signal?.current_gale),
