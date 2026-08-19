@@ -5,8 +5,7 @@ import { normalizeOutcome } from './analyzer.js';
  * Modos: simulator | supabase | api
  */
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://btyescbddoopbbuacyhd.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_KEY || '';
+import { CASINO_SUPABASE_URL, CASINO_SUPABASE_KEY } from './casinoSupabase.js';
 
 let roundCounter = 0;
 
@@ -29,14 +28,14 @@ function generateRound(gameId = 'bac_bo') {
 }
 
 export async function fetchSupabaseRounds(gameId = 'bac_bo', limit = 100) {
-  if (!SUPABASE_KEY) return null;
+  if (!CASINO_SUPABASE_KEY) return null;
 
   try {
-    const url = `${SUPABASE_URL}/rest/v1/bac_bo_rounds?select=id,outcome,multiplier,round_timestamp,game_id&game_id=eq.${gameId}&order=round_timestamp.desc&limit=${limit}`;
+    const url = `${CASINO_SUPABASE_URL}/rest/v1/bac_bo_rounds?select=id,outcome,multiplier,round_timestamp,game_id&game_id=eq.${gameId}&order=round_timestamp.desc&limit=${limit}`;
     const res = await fetch(url, {
       headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${SUPABASE_KEY}`,
+        apikey: CASINO_SUPABASE_KEY,
+        Authorization: `Bearer ${CASINO_SUPABASE_KEY}`,
       },
       signal: AbortSignal.timeout(8000),
     });
@@ -68,7 +67,7 @@ export class DataProvider {
   }
 
   async start() {
-    if (this.mode === 'supabase' && SUPABASE_KEY) {
+    if (this.mode === 'supabase' && CASINO_SUPABASE_KEY) {
       await this.loadSupabaseHistory();
       this.pollTimer = setInterval(() => this.pollSupabase(), 5000);
     } else {

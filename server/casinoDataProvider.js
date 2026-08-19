@@ -1,24 +1,14 @@
 import { normalizeOutcome, OUTCOMES } from './analyzer.js';
 import { dayStartIso } from './dayKey.js';
 import { calcWinRate } from './playResult.js';
-
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://btyescbddoopbbuacyhd.supabase.co';
-const SUPABASE_KEY =
-  process.env.SUPABASE_KEY || 'sb_publishable_eqZiBte_sQPi_YQQpGpl0w_7aMhJjgr';
+import { CASINO_SUPABASE_URL, casinoHeaders } from './casinoSupabase.js';
 
 const GAME_ID = process.env.BACBO_GAME_ID || 'bac_bo';
 
-function headers() {
-  return {
-    apikey: SUPABASE_KEY,
-    Authorization: `Bearer ${SUPABASE_KEY}`,
-  };
-}
-
 export async function fetchCasinoRounds(gameId = GAME_ID, limit = 200) {
   try {
-    const url = `${SUPABASE_URL}/rest/v1/bac_bo_rounds?select=id,outcome,multiplier,round_timestamp,game_id&game_id=eq.${gameId}&order=round_timestamp.desc&limit=${limit}`;
-    const res = await fetch(url, { headers: headers(), signal: AbortSignal.timeout(12000) });
+    const url = `${CASINO_SUPABASE_URL}/rest/v1/bac_bo_rounds?select=id,outcome,multiplier,round_timestamp,game_id&game_id=eq.${gameId}&order=round_timestamp.desc&limit=${limit}`;
+    const res = await fetch(url, { headers: casinoHeaders(), signal: AbortSignal.timeout(12000) });
     if (!res.ok) return [];
     const data = await res.json();
     return data
@@ -40,8 +30,8 @@ export async function fetchCasinoRounds(gameId = GAME_ID, limit = 200) {
 
 export async function fetchLatestCasinoSignal(gameId = GAME_ID) {
   try {
-    const url = `${SUPABASE_URL}/rest/v1/sinais?jogo=eq.${gameId}&order=criado_em.desc&limit=1`;
-    const res = await fetch(url, { headers: headers(), signal: AbortSignal.timeout(12000) });
+    const url = `${CASINO_SUPABASE_URL}/rest/v1/sinais?jogo=eq.${gameId}&order=criado_em.desc&limit=1`;
+    const res = await fetch(url, { headers: casinoHeaders(), signal: AbortSignal.timeout(12000) });
     if (!res.ok) return null;
     const data = await res.json();
     if (!data?.length) return null;
@@ -56,11 +46,11 @@ export async function fetchLatestCasinoSignal(gameId = GAME_ID) {
 export async function fetchCasinoScoreboard(gameId = GAME_ID) {
   try {
     const url =
-      `${SUPABASE_URL}/rest/v1/sinais?jogo=eq.${gameId}` +
+      `${CASINO_SUPABASE_URL}/rest/v1/sinais?jogo=eq.${gameId}` +
       `&scoreboard_green=gt.0&order=criado_em.desc&limit=1` +
       `&select=scoreboard_green,scoreboard_red,win_rate,criado_em`;
 
-    const res = await fetch(url, { headers: headers(), signal: AbortSignal.timeout(12000) });
+    const res = await fetch(url, { headers: casinoHeaders(), signal: AbortSignal.timeout(12000) });
     if (!res.ok) return null;
 
     const data = await res.json();
@@ -79,12 +69,12 @@ export async function fetchTodayResultSignals(gameId = GAME_ID) {
     const iso = dayStartIso();
 
     const url =
-      `${SUPABASE_URL}/rest/v1/sinais?jogo=eq.${gameId}` +
+      `${CASINO_SUPABASE_URL}/rest/v1/sinais?jogo=eq.${gameId}` +
       `&signal_status=eq.result&criado_em=gte.${encodeURIComponent(iso)}` +
       `&order=criado_em.asc&limit=500` +
       `&select=id,signal_status,result,result_value,bet_recommendation,bet_safe,current_gale,criado_em,sequence,entry_condition`;
 
-    const res = await fetch(url, { headers: headers(), signal: AbortSignal.timeout(12000) });
+    const res = await fetch(url, { headers: casinoHeaders(), signal: AbortSignal.timeout(12000) });
     if (!res.ok) return [];
 
     const data = await res.json();
