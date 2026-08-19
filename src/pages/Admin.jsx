@@ -65,27 +65,71 @@ function ActivityBadge({ activity }) {
 }
 
 export default function Admin() {
-  const { token, isSuperAdmin, canRequestVip, canViewActive } = useAuth();
+  const { token, isSuperAdmin, canRequestVip, canViewActive, loading: authLoading } = useAuth();
   const [users, setUsers] = useState([]);
   const [stats, setStats] = useState(null);
   const [vipRequests, setVipRequests] = useState([]);
   const [members, setMembers] = useState([]);
   const [iaActive, setIaActive] = useState([]);
-  const [tab, setTab] = useState(isSuperAdmin ? 'overview' : 'members');
+  const [tab, setTab] = useState('overview');
   const [search, setSearch] = useState('');
   const [msg, setMsg] = useState('');
+  const [loadError, setLoadError] = useState('');
+
+  useEffect(() => {
+    if (authLoading) return;
+    setTab(isSuperAdmin ? 'overview' : 'members');
+  }, [isSuperAdmin, authLoading]);
+
+  const buildStatsFromUsers = (list, iaList = [], iaConnections = 0) => {
+    const onlineNow = list.filter((u) => u.activity?.online).length;
+    return {
+      total: list.length,
+      members: list.filter((u) => u.role === 'member').length,
+      vip: list.filter((u) => u.role === 'vip').length,
+      admins: list.filter((u) => u.role === 'admin').length,
+      vipRequests: list.filter((u) => u.vipRequest?.status === 'pending').length,
+      onlineNow,
+      iaActiveNow: iaList.length,
+      iaConnections,
+    };
+  };
 
   const load = async () => {
+    if (!token || authLoading) return;
     try {
+      setLoadError('');
       if (isSuperAdmin) {
-        const [overview, requests] = await Promise.all([
-          fetchJson('/api/admin/overview', { headers: authHeaders(token) }),
-          fetchJson('/api/admin/vip-requests', { headers: authHeaders(token) }),
-        ]);
+        let overview = null;
+        try {
+          overview = await fetchJson('/api/admin/overview', { headers: authHeaders(token) });
+        } catch {
+          const [usersData, activeData] = await Promise.all([
+            fetchJson('/api/admin/users', { headers: authHeaders(token) }),
+            fetchJson('/api/admin/active-users', { headers: authHeaders(token) }).catch(() => null),
+          ]);
+          const list = (usersData.users || []).filter((u) => u.role !== 'super_admin');
+          overview = {
+            users: list,
+            stats: buildStatsFromUsers(
+              list,
+              activeData?.users || [],
+              activeData?.totalConnections || 0,
+            ),
+            iaActive: activeData?.users || [],
+          };
+        }
+
         setUsers(overview.users || []);
         setStats(overview.stats || null);
         setIaActive(overview.iaActive || []);
-        setVipRequests(requests.requests || []);
+
+        try {
+          const requests = await fetchJson('/api/admin/vip-requests', { headers: authHeaders(token) });
+          setVipRequests(requests.requests || []);
+        } catch {
+          setVipRequests([]);
+        }
         return;
       }
 
@@ -110,8 +154,8 @@ export default function Admin() {
           iaConnections: results[idx].totalConnections,
         });
       }
-    } catch {
-      /* ignore polling errors */
+    } catch (err) {
+      setLoadError(err.message || 'Erro ao carregar dados do painel');
     }
   };
 
@@ -119,7 +163,7 @@ export default function Admin() {
     load();
     const t = setInterval(load, 10000);
     return () => clearInterval(t);
-  }, [token, isSuperAdmin, canRequestVip, canViewActive]);
+  }, [token, isSuperAdmin, canRequestVip, canViewActive, authLoading]);
 
   const approve = async (id) => {
     try {
@@ -237,6 +281,12 @@ export default function Admin() {
             </span>
           )}
         </div>
+
+        {loadError && (
+          <p className="text-red-400 text-xs text-center bg-red-500/10 border border-red-500/20 py-2.5 rounded-lg">
+            {loadError}
+          </p>
+        )}
 
         {msg && (
           <p className="text-emerald-400 text-xs text-center bg-emerald-500/10 border border-emerald-500/20 py-2.5 rounded-lg">
