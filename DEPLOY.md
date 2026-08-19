@@ -24,16 +24,20 @@ Um único link público serve **tudo** (site + API + IA), como qualquer site nor
    - O Render lê o ficheiro `render.yaml` automaticamente
    - Clica **Apply**
 
-4. **Variáveis de ambiente** (no painel Render → sense-bot → Environment):
+4. **Variáveis de ambiente** (Render → sense-bot → Environment):
+
    | Variável | Valor |
    |----------|--------|
-   | `SUPER_ADMIN_EMAIL` | teu email (Chef Máximo) |
+   | `SUPER_ADMIN_EMAIL` | teu email |
    | `SUPER_ADMIN_PASSWORD` | password segura |
-   | `JWT_SECRET` | string longa aleatória (ou deixa o Render gerar) |
-   | `SUPABASE_URL` | (opcional) URL do casino |
-   | `SUPABASE_KEY` | (opcional) chave Supabase |
+   | `SUPABASE_URL` | `https://btyescbddoopbbuacyhd.supabase.co` |
+   | `SUPABASE_SERVICE_ROLE_KEY` | chave **service_role** do Supabase (Settings → API) |
 
-5. **Deploy** — espera 3–5 minutos. Ficas com um URL tipo:
+5. **Criar tabela de contas** (uma vez só):
+   - Supabase Dashboard → **SQL Editor** → New query
+   - Copia o conteúdo de `supabase/sense_bot_users.sql` e clica **Run**
+
+6. **Deploy** — Manual sync no Render
    ```
    https://sense-bot-xxxx.onrender.com
    ```
@@ -44,10 +48,13 @@ Um único link público serve **tudo** (site + API + IA), como qualquer site nor
 
 No Render: **Settings → Custom Domain** → podes ligar `sensebot.pt` ou similar.
 
-### Nota sobre o plano grátis
+### Contas persistentes
 
-- O site “adormece” após ~15 min sem visitas — a primeira abertura pode demorar ~30 s
-- Para produção séria, usa plano pago (~7 USD/mês) para ficar sempre ligado
+As contas ficam guardadas na **base de dados Supabase** (`sense_bot_users`), não num ficheiro temporário. Assim, reinícios do Render **não apagam** utilizadores registados.
+
+Verificar ligação localmente: `npm run db:check`
+
+### Nota sobre o plano grátis Render
 
 ## Alternativa local (só mesma Wi‑Fi)
 

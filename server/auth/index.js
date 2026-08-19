@@ -6,6 +6,7 @@ import {
   findByEmail,
   verifyPassword,
   seedSuperAdmin,
+  initUserStore,
   isVipOrAbove,
   isAdminOrAbove,
   hasPermission,
@@ -20,6 +21,7 @@ import {
   recordLogin,
   touchLastSeen,
   getAccountStats,
+  getStorageMode,
   ROLES,
 } from './userStore.js';
 
@@ -27,6 +29,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'bac-bo-bot-secret-change-in-produc
 const JWT_EXPIRES = '7d';
 
 export async function initAuth() {
+  await initUserStore();
   await seedSuperAdmin();
 }
 
@@ -42,22 +45,26 @@ export function verifyToken(token) {
   }
 }
 
-export function authMiddleware(req, res, next) {
-  const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
-  if (!token) {
-    return res.status(401).json({ error: 'Não autenticado' });
+export async function authMiddleware(req, res, next) {
+  try {
+    const header = req.headers.authorization || '';
+    const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+    if (!token) {
+      return res.status(401).json({ error: 'Não autenticado' });
+    }
+    const payload = verifyToken(token);
+    if (!payload) {
+      return res.status(401).json({ error: 'Sessão expirada' });
+    }
+    const user = sanitizeUser(await findById(payload.sub));
+    if (!user) {
+      return res.status(401).json({ error: 'Utilizador não encontrado' });
+    }
+    req.user = user;
+    next();
+  } catch (err) {
+    next(err);
   }
-  const payload = verifyToken(token);
-  if (!payload) {
-    return res.status(401).json({ error: 'Sessão expirada' });
-  }
-  const user = sanitizeUser(findById(payload.sub));
-  if (!user) {
-    return res.status(401).json({ error: 'Utilizador não encontrado' });
-  }
-  req.user = user;
-  next();
 }
 
 export function requireVip(req, res, next) {
@@ -101,8 +108,8 @@ export function registerAuthRoutes(app) {
         return res.status(400).json({ error: 'Password mínimo 6 caracteres' });
       }
       const user = await createUser({ email, password, name });
-      recordLogin(user.id);
-      const fresh = sanitizeUser(findById(user.id));
+      await recordLogin(user.id);
+      const fresh = sanitizeUser(await findById(user.id));
       const token = signToken(fresh);
       res.json({
         token,
@@ -117,11 +124,11 @@ export function registerAuthRoutes(app) {
   app.post('/api/auth/login', async (req, res) => {
     try {
       const { email, password } = req.body;
-      const raw = findByEmail(email);
+      const raw = await findByEmail(email);
       if (!raw || !(await verifyPassword(raw, password))) {
         return res.status(401).json({ error: 'Email ou password incorretos' });
       }
-      const user = recordLogin(raw.id) || sanitizeUser(raw);
+      const user = (await recordLogin(raw.id)) || sanitizeUser(raw);
       const token = signToken(user);
       res.json({ token, user });
     } catch (err) {
@@ -129,13 +136,13 @@ export function registerAuthRoutes(app) {
     }
   });
 
-  app.get('/api/auth/me', authMiddleware, (req, res) => {
-    const user = touchLastSeen(req.user.id) || req.user;
+  app.get('/api/auth/me', authMiddleware, async (req, res) => {
+    const user = (await touchLastSeen(req.user.id)) || req.user;
     res.json({ user });
   });
 
-  app.post('/api/auth/presence', authMiddleware, (req, res) => {
-    const user = touchLastSeen(req.user.id) || req.user;
+  app.post('/api/auth/presence', authMiddleware, async (req, res) => {
+    const user = (await touchLastSeen(req.user.id)) || req.user;
     res.json({ ok: true, user });
   });
 }
@@ -169,56 +176,71 @@ function enrichUsersWithActivity(users, activeSessions, onlineMs = 5 * 60 * 1000
 }
 
 export function registerAdminRoutes(app, activeSessions) {
-  app.get('/api/admin/overview', authMiddleware, requireSuperAdmin, (_, res) => {
-    const users = enrichUsersWithActivity(listUsers(), activeSessions);
-    const iaActive = activeSessions.getActiveUsers();
-    const onlineNow = users.filter((u) => u.activity.online).length;
-
-    res.json({
-      stats: {
-        ...getAccountStats(),
-        onlineNow,
-        iaActiveNow: iaActive.length,
-        iaConnections: activeSessions.getConnectionCount(),
-      },
-      users,
-      iaActive,
-    });
-  });
-
-  app.get('/api/admin/users', authMiddleware, requireSuperAdmin, (_, res) => {
-    res.json({ users: enrichUsersWithActivity(listUsers(), activeSessions) });
-  });
-
-  app.post('/api/admin/users/:id/approve-vip', authMiddleware, requireSuperAdmin, (req, res) => {
+  app.get('/api/admin/overview', authMiddleware, requireSuperAdmin, async (_, res) => {
     try {
-      const user = approveVip(req.params.id, req.user.id);
+      const allUsers = (await listUsers()).map(sanitizeUser);
+      const users = enrichUsersWithActivity(allUsers, activeSessions);
+      const iaActive = activeSessions.getActiveUsers();
+      const onlineNow = users.filter((u) => u.activity.online).length;
+
+      res.json({
+        stats: {
+          ...(await getAccountStats()),
+          onlineNow,
+          iaActiveNow: iaActive.length,
+          iaConnections: activeSessions.getConnectionCount(),
+        },
+        users,
+        iaActive,
+        storage: getStorageMode(),
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/admin/users', authMiddleware, requireSuperAdmin, async (_, res) => {
+    try {
+      const allUsers = (await listUsers()).map(sanitizeUser);
+      res.json({ users: enrichUsersWithActivity(allUsers, activeSessions) });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/admin/users/:id/approve-vip', authMiddleware, requireSuperAdmin, async (req, res) => {
+    try {
+      const user = await approveVip(req.params.id, req.user.id);
       res.json({ user, message: 'VIP aprovado com sucesso' });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
   });
 
-  app.post('/api/admin/users/:id/revoke-vip', authMiddleware, requireSuperAdmin, (req, res) => {
+  app.post('/api/admin/users/:id/revoke-vip', authMiddleware, requireSuperAdmin, async (req, res) => {
     try {
-      const user = revokeVip(req.params.id);
-      res.json({ user, message: 'VIP revogado' });
+      const user = await revokeVip(req.params.id);
+      res.json({ user, message: 'VIP removido — utilizador voltou a membro normal' });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
   });
 
-  app.get('/api/admin/vip-requests', authMiddleware, requireSuperAdmin, (_, res) => {
-    res.json({ requests: listVipRequests() });
+  app.get('/api/admin/vip-requests', authMiddleware, requireSuperAdmin, async (_, res) => {
+    try {
+      res.json({ requests: await listVipRequests() });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   app.post(
     '/api/admin/users/:id/request-vip',
     authMiddleware,
     requirePermission('can_request_vip'),
-    (req, res) => {
+    async (req, res) => {
       try {
-        const user = requestVipPromotion(req.params.id, req.user.id);
+        const user = await requestVipPromotion(req.params.id, req.user.id);
         res.json({
           user,
           message: 'Pedido enviado ao Chef Máximo para aprovação VIP',
@@ -229,18 +251,22 @@ export function registerAdminRoutes(app, activeSessions) {
     },
   );
 
-  app.post('/api/admin/users/:id/reject-vip-request', authMiddleware, requireSuperAdmin, (req, res) => {
+  app.post('/api/admin/users/:id/reject-vip-request', authMiddleware, requireSuperAdmin, async (req, res) => {
     try {
-      const user = rejectVipRequest(req.params.id);
+      const user = await rejectVipRequest(req.params.id);
       res.json({ user, message: 'Pedido VIP rejeitado' });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
   });
 
-  app.get('/api/admin/members', authMiddleware, requirePermission('can_request_vip'), (_, res) => {
-    const members = listUsers().filter((u) => u.role === ROLES.MEMBER);
-    res.json({ users: members });
+  app.get('/api/admin/members', authMiddleware, requirePermission('can_request_vip'), async (_, res) => {
+    try {
+      const members = (await listUsers()).filter((u) => u.role === ROLES.MEMBER).map(sanitizeUser);
+      res.json({ users: members });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   app.get('/api/admin/active-users', authMiddleware, requirePermission('can_view_active_users'), (_, res) => {
@@ -252,19 +278,23 @@ export function registerAdminRoutes(app, activeSessions) {
     });
   });
 
-  app.post('/api/admin/promote-admin/:id', authMiddleware, requireSuperAdmin, (req, res) => {
+  app.post('/api/admin/promote-admin/:id', authMiddleware, requireSuperAdmin, async (req, res) => {
     try {
       const { can_view_active_users = true, can_request_vip = true } = req.body;
-      const user = promoteToAdmin(req.params.id, { can_view_active_users, can_request_vip }, req.user.id);
+      const user = await promoteToAdmin(
+        req.params.id,
+        { can_view_active_users, can_request_vip },
+        req.user.id,
+      );
       res.json({ user, message: 'Promovido a Admin' });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
   });
 
-  app.patch('/api/admin/permissions/:id', authMiddleware, requireSuperAdmin, (req, res) => {
+  app.patch('/api/admin/permissions/:id', authMiddleware, requireSuperAdmin, async (req, res) => {
     try {
-      const user = updateAdminPermissions(req.params.id, req.body);
+      const user = await updateAdminPermissions(req.params.id, req.body);
       res.json({ user, message: 'Permissões atualizadas' });
     } catch (err) {
       res.status(400).json({ error: err.message });
@@ -272,4 +302,4 @@ export function registerAdminRoutes(app, activeSessions) {
   });
 }
 
-export { isVipOrAbove, isAdminOrAbove, hasPermission, sanitizeUser, findById, ROLES };
+export { isVipOrAbove, isAdminOrAbove, hasPermission, sanitizeUser, findById, getStorageMode, ROLES };

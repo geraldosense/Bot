@@ -204,8 +204,8 @@ export default function Admin() {
     }
   };
 
-  const revoke = async (id) => {
-    if (!confirm('Revogar VIP deste utilizador?')) return;
+  const revoke = async (id, name) => {
+    if (!confirm(`Remover VIP de ${name || 'este utilizador'}? Perde acesso aos robôs.`)) return;
     try {
       const d = await fetchJson(`/api/admin/users/${id}/revoke-vip`, {
         method: 'POST',
@@ -271,7 +271,7 @@ export default function Admin() {
             </h1>
             <p className="text-zinc-500 text-xs mt-1">
               {isSuperAdmin
-                ? 'Todas as contas, emails e utilização da IA em tempo real'
+                ? 'Aprova, remove VIP e gere todas as contas'
                 : 'Solicita VIP — o Chef Máximo aprova'}
             </p>
           </div>
@@ -388,14 +388,24 @@ export default function Admin() {
               >
                 {filteredUsers.map((u) => (
                   <AccountRow key={u.id} user={u}>
-                    {u.role === 'member' && (
-                      <button
-                        onClick={() => approve(u.id)}
-                        className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white text-[10px] font-bold transition-colors shrink-0"
-                      >
-                        <Crown className="w-3 h-3" /> VIP
-                      </button>
-                    )}
+                    <div className="flex flex-col gap-1.5 shrink-0">
+                      {u.role === 'member' && (
+                        <button
+                          onClick={() => approve(u.id)}
+                          className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white text-[10px] font-bold transition-colors"
+                        >
+                          <Crown className="w-3 h-3" /> Dar VIP
+                        </button>
+                      )}
+                      {u.role === 'vip' && (
+                        <button
+                          onClick={() => revoke(u.id, u.name)}
+                          className="flex items-center gap-1 px-2.5 py-1.5 bg-red-600/90 hover:bg-red-600 rounded-lg text-white text-[10px] font-bold transition-colors"
+                        >
+                          <X className="w-3 h-3" /> Remover VIP
+                        </button>
+                      )}
+                    </div>
                   </AccountRow>
                 ))}
               </Section>
@@ -464,10 +474,10 @@ export default function Admin() {
                         <UserPlus className="w-3 h-3" /> Admin
                       </button>
                       <button
-                        onClick={() => revoke(u.id)}
-                        className="flex items-center gap-1 px-2.5 py-1.5 bg-red-600/80 hover:bg-red-600 rounded-lg text-white text-[10px] font-bold transition-colors"
+                        onClick={() => revoke(u.id, u.name)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 bg-red-600/90 hover:bg-red-600 rounded-lg text-white text-[10px] font-bold transition-colors"
                       >
-                        <X className="w-3 h-3" /> Revogar
+                        <X className="w-3 h-3" /> Remover VIP
                       </button>
                     </div>
                   </UserCard>

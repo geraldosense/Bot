@@ -2942,13 +2942,53 @@
               "gale": 0,
               "maxGales": 0,
               "at": "2026-08-19T00:55:00.263356+00:00"
+            },
+            {
+              "id": "c289f4d0-4f45-4b49-ba7a-87f3378eeee6",
+              "result": "green",
+              "bet": null,
+              "gale": 0,
+              "maxGales": 0,
+              "at": "2026-08-19T01:20:39.706862+00:00"
+            },
+            {
+              "id": "723b401b-c460-4335-903f-d9e12c759a5c",
+              "result": "green",
+              "bet": null,
+              "gale": 0,
+              "maxGales": 0,
+              "at": "2026-08-19T01:22:13.955385+00:00"
+            },
+            {
+              "id": "83bec744-7572-4437-b7e5-a58223fb9f16",
+              "result": "green",
+              "bet": null,
+              "gale": 0,
+              "maxGales": 0,
+              "at": "2026-08-19T01:23:17.465112+00:00"
+            },
+            {
+              "id": "dfea390a-b724-454a-be92-8fba6a4718a8",
+              "result": "green",
+              "bet": null,
+              "gale": 0,
+              "maxGales": 0,
+              "at": "2026-08-19T01:26:45.176716+00:00"
+            },
+            {
+              "id": "16499ce5-591a-461c-8db5-19831950593d",
+              "result": "green",
+              "bet": null,
+              "gale": 0,
+              "maxGales": 0,
+              "at": "2026-08-19T01:32:36.007258+00:00"
             }
           ],
           "casinoTotals": {
-            "greens": 348,
+            "greens": 353,
             "reds": 13,
-            "winRate": 96.4,
-            "syncedAt": "2026-08-19T00:55:01.22247+00:00"
+            "winRate": 96.45,
+            "syncedAt": "2026-08-19T01:32:36.851864+00:00"
           }
         }
       }

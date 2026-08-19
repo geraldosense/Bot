@@ -16,6 +16,7 @@ import {
   sanitizeUser,
   findById,
   isVipOrAbove,
+  getStorageMode,
 } from './auth/index.js';
 import { ActiveSessions } from './auth/activeSessions.js';
 
@@ -52,11 +53,11 @@ await initAuth();
 registerAuthRoutes(app);
 registerAdminRoutes(app, activeSessions);
 
-wss.on('connection', (ws, req) => {
+wss.on('connection', async (ws, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const token = url.searchParams.get('token');
   const payload = token ? verifyToken(token) : null;
-  const rawUser = payload ? findById(payload.sub) : null;
+  const rawUser = payload ? await findById(payload.sub) : null;
   const user = sanitizeUser(rawUser);
 
   if (!user || !isVipOrAbove(user)) {
@@ -95,6 +96,7 @@ wss.on('connection', (ws, req) => {
 app.get('/api/health', (_, res) => {
   res.json({
     status: 'ok',
+    storage: getStorageMode(),
     state: engine.state,
     rounds: engine.rounds.length,
     casinoConnected: engine.casinoConnected,
