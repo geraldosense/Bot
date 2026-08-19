@@ -1,6 +1,7 @@
 # Sense Bot — Bac Bo
 
 Robô de análise Bac Bo em tempo real com sinais, placar diário, catalogador e dashboard VIP.
+https://sense-bot-f2yw.onrender.com/login
 
 ## Funcionalidades
 
