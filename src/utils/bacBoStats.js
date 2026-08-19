@@ -146,20 +146,37 @@ export function getPredictedZone(signal, showMonitoring) {
   return null;
 }
 
-const GALE_LABELS = ['1° GALE', '2° GALE', '3° GALE'];
-export const TOTAL_GALE_ATTEMPTS = GALE_LABELS.length;
+/** Entrada inicial + gales após falha (API current_gale 0-based) */
+export const ATTEMPT_LABELS = ['ENTRADA', '1° GALE', '2° GALE'];
+export const TOTAL_ATTEMPTS = ATTEMPT_LABELS.length;
+/** @deprecated use TOTAL_ATTEMPTS — mantido por compatibilidade */
+export const TOTAL_GALE_ATTEMPTS = TOTAL_ATTEMPTS;
+export const GALE_ROUNDS = TOTAL_ATTEMPTS - 1;
 
-/** API usa current_gale 0-based: 0 = 1° gale (entrada), 1 = 2° gale, 2 = 3° gale */
-export function apiGaleToDisplayNumber(apiGale = 0) {
-  return Math.min(TOTAL_GALE_ATTEMPTS, Math.max(1, Number(apiGale) + 1));
+/** API: 0 = entrada (não é gale), 1 = 1° gale, 2 = 2° gale */
+export function formatAttemptLabel(apiGale = 0) {
+  const idx = Math.max(0, Math.min(Number(apiGale) || 0, TOTAL_ATTEMPTS - 1));
+  return ATTEMPT_LABELS[idx];
+}
+
+export function isEntryAttempt(apiGale = 0) {
+  return Number(apiGale) === 0;
 }
 
 export function apiGaleToBarIndex(apiGale = 0) {
-  return Math.min(TOTAL_GALE_ATTEMPTS - 1, Math.max(0, Number(apiGale) || 0));
+  return Math.max(0, Math.min(Number(apiGale) || 0, TOTAL_ATTEMPTS - 1));
 }
 
+/** Etiqueta da tentativa — entrada ou gale */
 export function formatGaleLabel(apiGale = 0) {
-  return `${apiGaleToDisplayNumber(apiGale)}° GALE`;
+  return formatAttemptLabel(apiGale);
+}
+
+export function formatResultAttemptLine(signal) {
+  const label = formatAttemptLabel(signal?.current_gale);
+  const isGreen = String(signal?.result || '').toLowerCase() === 'green';
+  const prep = label === 'ENTRADA' ? 'na' : 'no';
+  return isGreen ? `Acertou ${prep} ${label}` : `Perdeu ${prep} ${label}`;
 }
 
 export function getStatusLabel(signal, showMonitoring) {
@@ -170,12 +187,12 @@ export function getStatusLabel(signal, showMonitoring) {
     return { sub: 'PROCESSANDO', main: 'ANALISANDO' };
   }
   if (signal.signal_status === 'confirmed') {
-    return { sub: '1° GALE', main: 'ENTRADA CONFIRMADA' };
+    return { sub: 'ENTRADA', main: 'ENTRADA CONFIRMADA' };
   }
   if (signal.signal_status === 'gale_update') {
     const apiGale = Number(signal.current_gale) || 0;
     return {
-      sub: formatGaleLabel(apiGale),
+      sub: formatAttemptLabel(apiGale),
       main: 'MANTER A MESMA COR',
     };
   }
@@ -193,7 +210,7 @@ export function getColorConfig(zone) {
   return BACBO_COLORS[zone] || null;
 }
 
-/** Estado das 3 barras — entrada = 1° gale, depois 2° e 3° gale */
+/** Barras: ENTRADA → 1° gale → 2° gale (só após falha da entrada) */
 export function getGaleProgress(signal) {
   if (!signal || !['confirmed', 'gale_update', 'result'].includes(signal.signal_status)) {
     return null;
@@ -219,11 +236,11 @@ export function getGaleProgress(signal) {
   }
 
   return {
-    labels: GALE_LABELS,
+    labels: ATTEMPT_LABELS,
     activeIndex,
     failedIndex,
     galesAllowed,
-    show: galesAllowed > 0 || signal.signal_status === 'gale_update',
+    show: true,
   };
 }
 

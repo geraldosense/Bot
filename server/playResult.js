@@ -1,12 +1,13 @@
-/** Regras de gale — 3 tentativas: 1° gale (entrada), 2° gale, 3° gale */
+/** Regras: entrada inicial + gales só após falha (API current_gale 0 = entrada) */
 
 export const MAX_GALES = 2;
 export const GALE_ATTEMPTS = MAX_GALES + 1;
+export const ATTEMPT_LABELS = ['ENTRADA', '1° GALE', '2° GALE'];
 
 /**
  * Classifica o resultado final de uma jogada.
- * - Green em qualquer gale (1°, 2° ou 3°) = acerto
- * - Loss só conta se falhou no 3° gale (current_gale >= maxGales na API)
+ * - Green na entrada ou em qualquer gale = acerto
+ * - Loss só conta se falhou no último gale (current_gale >= maxGales)
  */
 export function classifyPlayResult(signal) {
   if (!signal || signal.signal_status !== 'result') return null;
@@ -32,34 +33,38 @@ export function isPlayGreen(signal) {
   return classifyPlayResult(signal) === 'green';
 }
 
-/** Etiqueta do gale — API usa current_gale 0-based */
+export function formatAttemptLabel(apiGale = 0) {
+  const idx = Math.max(0, Math.min(Number(apiGale) || 0, ATTEMPT_LABELS.length - 1));
+  return ATTEMPT_LABELS[idx];
+}
+
 export function formatGaleLabel(apiGale = 0) {
-  const n = Math.max(0, Math.min(Number(apiGale) || 0, MAX_GALES));
-  return `${n + 1}° GALE`;
+  return formatAttemptLabel(apiGale);
 }
 
 export function buildPlayResultAlert(signal, outcome) {
   if (!signal || !outcome) return null;
 
-  const galeLabel = formatGaleLabel(signal.current_gale);
+  const attemptLabel = formatAttemptLabel(signal.current_gale);
   const bet = String(signal.bet_recommendation || signal.bet || signal.entry_bet || '').toUpperCase();
+  const prep = attemptLabel === 'ENTRADA' ? 'na' : 'no';
 
   if (outcome === 'green') {
     return {
       outcome: 'green',
       title: 'ACERTOU',
-      message: `Sinal confirmado — ${galeLabel}`,
+      message: `Acertou ${prep} ${attemptLabel}`,
       sub: bet ? `Cor: ${bet}` : null,
-      galeLabel,
+      galeLabel: attemptLabel,
     };
   }
 
   return {
     outcome: 'loss',
     title: 'PERDEU',
-    message: `Errou nos ${GALE_ATTEMPTS} gales`,
+    message: `Perdeu ${prep} ${attemptLabel} — entrada e gales esgotados`,
     sub: bet ? `Entrada: ${bet}` : 'Todos os gales esgotados',
-    galeLabel,
+    galeLabel: attemptLabel,
   };
 }
 

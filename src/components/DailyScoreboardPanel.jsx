@@ -94,7 +94,7 @@ function DailyScoreStrip({ stats, gameName, live, playsToday }) {
 
       {playsToday > 0 && (
         <p className="text-zinc-600 text-[9px] text-center mt-2">
-          Histórico do robô · {playsToday} jogadas · perda só após o 3° gale
+          Histórico do robô · {playsToday} jogadas · perda só após esgotar entrada e gales
         </p>
       )}
     </div>
@@ -164,7 +164,7 @@ function SimulatorTab({ stats, maxGales, disabled }) {
       </div>
 
       <p className="text-zinc-600 text-[9px] leading-relaxed text-center">
-        {stats.greens} verdes · {stats.reds} perdas · payout 0,95x · 1° ao 3° gale
+        {stats.greens} verdes · {stats.reds} perdas · payout 0,95x · entrada + gales
       </p>
     </div>
   );

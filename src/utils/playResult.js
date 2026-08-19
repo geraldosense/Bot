@@ -1,7 +1,8 @@
-/** Regras de gale — 1° gale = entrada, depois 2° e 3° gale */
+/** Regras de gale — entrada inicial + gales após falha */
 
 export const MAX_GALES = 2;
 export const GALE_ATTEMPTS = MAX_GALES + 1;
+export const ATTEMPT_LABELS = ['ENTRADA', '1° GALE', '2° GALE'];
 
 export function classifyPlayResult(signal) {
   if (!signal || signal.signal_status !== 'result') return null;
@@ -27,9 +28,13 @@ export function isPlayGreen(signal) {
   return classifyPlayResult(signal) === 'green';
 }
 
+export function formatAttemptLabel(apiGale = 0) {
+  const idx = Math.max(0, Math.min(Number(apiGale) || 0, ATTEMPT_LABELS.length - 1));
+  return ATTEMPT_LABELS[idx];
+}
+
 export function formatGaleLabel(apiGale = 0) {
-  const n = Math.max(0, Math.min(Number(apiGale) || 0, MAX_GALES));
-  return `${n + 1}° GALE`;
+  return formatAttemptLabel(apiGale);
 }
 
 export function calcWinRate(greens, reds) {

@@ -1,4 +1,4 @@
-/** Simulador — perda só após falhar no 3° gale */
+/** Simulador — perda só após falhar entrada e gales */
 
 import { MAX_GALES, galeLossMultiplier } from './playResult.js';
 

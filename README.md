@@ -21,7 +21,7 @@ Três separadores no topo:
 | **SIMULADOR DE LUCRO** | Simulação com valor de aposta |
 | **BANCA** | Banca inicial, aposta base e banca atual |
 
-Texto de apoio: *Histórico do robô · X jogadas · perda só após o 3° gale*
+Texto de apoio: *Histórico do robô · X jogadas · perda só após esgotar entrada e gales*
 
 Meta **IA Premium — 90%+** de acertividade diária.
 

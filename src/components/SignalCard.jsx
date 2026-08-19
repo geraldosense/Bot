@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { CheckCircle, Shield, Zap, TrendingUp } from 'lucide-react';
 import BacBoTable from './BacBoTable';
 import { formatTime } from '../hooks/useWebSocket';
-import { getEntryZone, betToZone, formatGaleLabel, TOTAL_GALE_ATTEMPTS } from '../utils/bacBoStats';
+import { getEntryZone, betToZone, formatAttemptLabel, GALE_ROUNDS } from '../utils/bacBoStats';
 import {
   getResultLabel,
   getResultStyles,
@@ -112,8 +112,8 @@ export default function SignalCard({ signal }) {
             <div>
               <h3 className="text-green-300 font-bold text-sm">
                 {isGale
-                  ? `${formatGaleLabel(signal.current_gale)} — MANTER A MESMA COR`
-                  : '1° GALE — ENTRADA CONFIRMADA'}
+                  ? `${formatAttemptLabel(signal.current_gale)} — MANTER A MESMA COR`
+                  : 'ENTRADA CONFIRMADA'}
               </h3>
               <p className="text-[10px] text-green-500">{formatTime(signal.created_date)}</p>
             </div>
@@ -148,7 +148,7 @@ export default function SignalCard({ signal }) {
           <div className="bg-purple-500/15 border border-purple-500/40 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5">
             <Zap className="w-3 h-3 text-purple-400" />
             <span className="text-purple-300 text-[10px] font-bold">
-              1° AO {TOTAL_GALE_ATTEMPTS}° GALE
+              ENTRADA + ATÉ {GALE_ROUNDS} GALES
             </span>
           </div>
         </div>

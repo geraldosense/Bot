@@ -2,7 +2,8 @@ import {
   getEntryZone,
   betToZone,
   getColorConfig,
-  formatGaleLabel,
+  formatAttemptLabel,
+  formatResultAttemptLine,
 } from './bacBoStats';
 
 export function isSignalGreen(signal) {
@@ -108,11 +109,7 @@ export function getSignalOutcomeColor(signal) {
 }
 
 export function getGaleResultLine(signal) {
-  const apiGale = Number(signal?.current_gale) || 0;
-  const galeLabel = formatGaleLabel(apiGale);
-  return isSignalGreen(signal)
-    ? `Acertou no ${galeLabel}`
-    : `Perdeu no ${galeLabel}`;
+  return formatResultAttemptLine(signal);
 }
 
 export function getResultHighlightColor(signal) {

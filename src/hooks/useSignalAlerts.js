@@ -17,7 +17,7 @@ function buildAlertFromSignal(signal) {
     message: getGaleResultLine(signal),
     sub: isGreen
       ? 'Entrada confirmada pela IA'
-      : 'Errou em todos os gales (1°, 2° e 3°)',
+      : 'Errou na entrada e em todos os gales',
     signal,
     at: Date.now(),
   };
