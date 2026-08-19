@@ -11,6 +11,17 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      (function () {
+        var port = window.location.port;
+        var host = window.location.hostname;
+        if (host === 'localhost' || host === '127.0.0.1') {
+          if (port && port !== '3001' && port !== '5173') {
+            window.location.replace('http://localhost:3001/login');
+          }
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

@@ -44,6 +44,7 @@ const casino = new CasinoDataProvider({
   onRounds: (rounds, meta) => engine.setCasinoRounds(rounds, meta),
   onSignal: (signal) => engine.setCasinoSignal(signal),
   onStatus: (status) => engine.setCasinoStatus(status),
+  onSyncScoreboard: (data) => engine.syncScoreboardData(data),
 });
 
 await initAuth();
@@ -102,6 +103,10 @@ app.get('/api/health', (_, res) => {
 
 app.get('/api/snapshot', authMiddleware, requireVip, (_, res) => {
   res.json(engine.getSnapshot());
+});
+
+app.get('/api/scoreboard', authMiddleware, requireVip, (_, res) => {
+  res.json(engine.getScoreboard());
 });
 
 app.get('/api/rounds', authMiddleware, requireVip, (_, res) => {

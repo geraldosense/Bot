@@ -1,9 +1,9 @@
 import { shouldShowMonitoring } from './casinoDataProvider.js';
-import { OUTCOMES } from './analyzer.js';
+import { scoreboardStore } from './scoreboardStore.js';
 
 /**
- * Motor de sinais — usa APENAS dados reais do casino (Evolution Bac Bo).
- * Não gera entradas aleatórias nem simuladas.
+ * Motor de sinais — dados reais Evolution Bac Bo.
+ * Placar = histórico persistente + sync moneytix (fonte única no servidor).
  */
 export class SignalEngine {
   constructor(broadcast) {
@@ -11,14 +11,22 @@ export class SignalEngine {
     this.rounds = [];
     this.currentSignal = null;
     this.signalHistory = [];
-    this.scoreboard = { greens: 0, reds: 0 };
     this.state = 'idle';
     this.casinoConnected = false;
     this.dataSource = 'evolution_casino';
+    this.historyBootstrapped = false;
   }
 
   emit(type, data) {
     this.broadcast({ type, data, timestamp: new Date().toISOString() });
+  }
+
+  getScoreboard() {
+    return scoreboardStore.getScoreboard();
+  }
+
+  emitScoreboard() {
+    this.emit('scoreboard', this.getScoreboard());
   }
 
   emitState() {
@@ -47,63 +55,54 @@ export class SignalEngine {
     return 'idle';
   }
 
-  getScoreboard() {
-    const fromSignal = this.getScoreboardFromSignal(this.currentSignal);
-    if (fromSignal) {
-      this.scoreboard = { greens: fromSignal.greens, reds: fromSignal.reds };
-      return fromSignal;
+  /** Importa jogadas do dia + totais externos */
+  syncScoreboardData({ casinoScoreboard, todayResults = [] }) {
+    if (todayResults.length) {
+      scoreboardStore.importPlays(todayResults);
+      this.mergeHistoryFromResults(todayResults);
     }
-
-    const { greens, reds } = this.scoreboard;
-    const total = greens + reds;
-    return {
-      greens,
-      reds,
-      winRate: total ? Math.round((greens / total) * 100) : 0,
-      gameId: 'bac_bo',
-      source: 'internal',
-    };
+    if (casinoScoreboard) {
+      scoreboardStore.syncCasinoTotals(casinoScoreboard);
+    }
+    this.emitScoreboard();
   }
 
-  /** Totais da IA moneytix — scoreboard_green / scoreboard_red no sinal Supabase */
-  getScoreboardFromSignal(signal) {
-    if (!signal) return null;
+  mergeHistoryFromResults(results = []) {
+    const seen = new Set(this.signalHistory.map((s) => String(s.id)));
+    let added = false;
 
-    const greens = Number(signal.scoreboard_green);
-    const reds = Number(signal.scoreboard_red);
-    if (!Number.isFinite(greens) || !Number.isFinite(reds)) return null;
+    for (const raw of results) {
+      if (raw?.signal_status !== 'result' || !raw?.id) continue;
+      const id = String(raw.id);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      this.signalHistory.push(this.enrichSignal(raw));
+      added = true;
+    }
 
-    const total = greens + reds;
-    if (total === 0 && signal.signal_status !== 'result') return null;
+    if (!added) return;
 
-    const winRateRaw = Number(signal.win_rate);
-    return {
-      greens,
-      reds,
-      winRate: Number.isFinite(winRateRaw)
-        ? Math.round(winRateRaw)
-        : total
-          ? Math.round((greens / total) * 100)
-          : 0,
-      gameId: 'bac_bo',
-      source: 'casino_ia',
-    };
+    this.signalHistory.sort(
+      (a, b) => new Date(b.created_date) - new Date(a.created_date),
+    );
+    if (this.signalHistory.length > 50) {
+      this.signalHistory = this.signalHistory.slice(0, 50);
+    }
+    this.emit('history', this.signalHistory);
   }
 
-  /** Sincroniza placar com a IA do casino em cada poll */
-  syncScoreboardFromSignal(signal, prevStatus) {
-    if (!signal) return;
+  bootstrapHistory(todayResults = []) {
+    if (this.historyBootstrapped) return;
+    scoreboardStore.importPlays(todayResults);
+    this.mergeHistoryFromResults(todayResults);
+    this.historyBootstrapped = true;
+    this.emitScoreboard();
+  }
 
-    const fromCasino = this.getScoreboardFromSignal(signal);
-    if (fromCasino && fromCasino.greens + fromCasino.reds > 0) {
-      this.scoreboard = { greens: fromCasino.greens, reds: fromCasino.reds };
-      return;
-    }
-
-    if (signal.signal_status === 'result' && prevStatus !== 'result') {
-      if (signal.result === 'green') this.scoreboard.greens++;
-      else if (signal.result === 'loss') this.scoreboard.reds++;
-    }
+  setCasinoScoreboard(casinoScoreboard) {
+    if (!casinoScoreboard) return;
+    scoreboardStore.syncCasinoTotals(casinoScoreboard);
+    this.emitScoreboard();
   }
 
   setCasinoRounds(rounds, meta = {}) {
@@ -140,17 +139,33 @@ export class SignalEngine {
     }
 
     const prevStatus = prev?.signal_status;
-    this.syncScoreboardFromSignal(signal, prevStatus);
-    this.currentSignal = signal;
+    this.currentSignal = this.enrichSignal(signal);
 
-    if (signal.signal_status === 'result' && prevStatus !== 'result') {
-      this.signalHistory.unshift({ ...signal });
-      if (this.signalHistory.length > 50) this.signalHistory.pop();
-      this.emit('history', this.signalHistory);
+    if (signal.signal_status === 'result') {
+      scoreboardStore.recordPlay(this.currentSignal);
+
+      if (prevStatus !== 'result') {
+        this.signalHistory.unshift({ ...this.currentSignal });
+        if (this.signalHistory.length > 50) this.signalHistory.pop();
+        this.emit('history', this.signalHistory);
+      }
     }
 
-    this.emit('signal', { ...signal, scoreboard: this.getScoreboard() });
+    this.emit('signal', this.currentSignal);
     this.emitState();
+  }
+
+  enrichSignal(signal) {
+    const sb = scoreboardStore.getScoreboard();
+    const assertividade = sb.winRate;
+    const meetsTarget = sb.meetsTarget === true;
+
+    return {
+      ...signal,
+      ia_assertividade: assertividade,
+      meets_assertivity_target: meetsTarget,
+      confidence: meetsTarget ? assertividade : signal.confidence ?? null,
+    };
   }
 
   setCasinoStatus(status) {
@@ -175,7 +190,6 @@ export class SignalEngine {
     };
   }
 
-  /** Apenas re-sincroniza — nunca inventa sinal */
   forceAnalyze() {
     this.emit('refresh_requested', { at: new Date().toISOString() });
   }

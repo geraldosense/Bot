@@ -36,7 +36,7 @@ export default function DailyProfitSimulator({ scoreboard, maxGales = 2, disable
       <div className="flex items-center gap-3 mb-4">
         <label className="text-zinc-400 text-xs shrink-0">Valor da aposta</label>
         <div className="relative flex-1">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">R$</span>
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">€</span>
           <input
             type="number"
             min="1"

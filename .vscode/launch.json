@@ -1,0 +1,31 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Go Live — Produção",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:3001/login",
+      "webRoot": "${workspaceFolder}",
+      "preLaunchTask": "Go Live: Bac Bo Bot",
+      "serverReadyAction": {
+        "pattern": "http://localhost:3001",
+        "uriFormat": "http://localhost:3001/login",
+        "action": "openExternally"
+      }
+    },
+    {
+      "name": "Go Live — Dev",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173/login",
+      "webRoot": "${workspaceFolder}",
+      "preLaunchTask": "Go Live: Dev (hot reload)",
+      "serverReadyAction": {
+        "pattern": "http://localhost:5173",
+        "uriFormat": "http://localhost:5173/login",
+        "action": "openExternally"
+      }
+    }
+  ]
+}

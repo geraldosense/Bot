@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 
-export default function GameCard({ game, selected, onSelect }) {
+export default function GameCard({ game, selected, onSelect, liveAssertivity }) {
+  const confidence = liveAssertivity || game.confidence;
   return (
     <motion.button
       whileHover={{ scale: game.disabled ? 1 : 1.03 }}
@@ -31,7 +32,7 @@ export default function GameCard({ game, selected, onSelect }) {
         <div className="absolute bottom-0 left-0 right-0 p-2.5">
           <p className="text-white font-black text-xs leading-tight drop-shadow-md">{game.name}</p>
           <div className="flex items-center justify-between mt-1">
-            <p className="text-emerald-400 text-[10px] font-bold">{game.confidence}</p>
+            <p className="text-emerald-400 text-[10px] font-bold">{confidence}</p>
             {game.disabled && (
               <p className="text-zinc-400 text-[9px] font-semibold">Em breve</p>
             )}

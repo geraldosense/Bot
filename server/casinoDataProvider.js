@@ -1,4 +1,6 @@
 import { normalizeOutcome, OUTCOMES } from './analyzer.js';
+import { dayStartIso } from './dayKey.js';
+import { calcWinRate } from './playResult.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://btyescbddoopbbuacyhd.supabase.co';
 const SUPABASE_KEY =
@@ -50,12 +52,82 @@ export async function fetchLatestCasinoSignal(gameId = GAME_ID) {
   }
 }
 
+/** Placar diário moneytix — último sinal com scoreboard_green preenchido pela IA */
+export async function fetchCasinoScoreboard(gameId = GAME_ID) {
+  try {
+    const url =
+      `${SUPABASE_URL}/rest/v1/sinais?jogo=eq.${gameId}` +
+      `&scoreboard_green=gt.0&order=criado_em.desc&limit=1` +
+      `&select=scoreboard_green,scoreboard_red,win_rate,criado_em`;
+
+    const res = await fetch(url, { headers: headers(), signal: AbortSignal.timeout(12000) });
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    if (!data?.length) return null;
+
+    return mapScoreboardRow(data[0], gameId);
+  } catch (err) {
+    console.error('[casino] Erro ao buscar placar:', err.message);
+    return null;
+  }
+}
+
+/** Resultados do dia — histórico real de cada jogada */
+export async function fetchTodayResultSignals(gameId = GAME_ID) {
+  try {
+    const iso = dayStartIso();
+
+    const url =
+      `${SUPABASE_URL}/rest/v1/sinais?jogo=eq.${gameId}` +
+      `&signal_status=eq.result&criado_em=gte.${encodeURIComponent(iso)}` +
+      `&order=criado_em.asc&limit=500` +
+      `&select=id,signal_status,result,result_value,bet_recommendation,bet_safe,current_gale,criado_em,sequence,entry_condition`;
+
+    const res = await fetch(url, { headers: headers(), signal: AbortSignal.timeout(12000) });
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    return (data || []).map(mapCasinoSignal).filter(Boolean);
+  } catch (err) {
+    console.error('[casino] Erro ao buscar histórico do dia:', err.message);
+    return [];
+  }
+}
+
+export function mapScoreboardRow(row, gameId = GAME_ID) {
+  if (!row) return null;
+
+  const greens = Number(row.scoreboard_green) || 0;
+  const reds = Number(row.scoreboard_red) || 0;
+
+  return {
+    greens,
+    reds,
+    winRate: calcWinRate(greens, reds),
+    gameId,
+    source: 'casino_ia',
+    updatedAt: row.criado_em,
+  };
+}
+
 function mapBetRecommendation(rec) {
   if (!rec) return null;
   const s = String(rec).toUpperCase();
   if (s.includes('AZUL') || s.includes('JOGADOR')) return 'Player';
   if (s.includes('VERMELHO') || s.includes('BANCA') || s.includes('CASA')) return 'Banker';
   if (s.includes('EMPATE') || s.includes('TIE')) return 'Tie';
+  return null;
+}
+
+function resolveIaConfidence(row, signalStatus, bet) {
+  if (!bet || !['confirmed', 'gale_update'].includes(signalStatus)) return null;
+
+  const g = Number(row.scoreboard_green) || 0;
+  const r = Number(row.scoreboard_red) || 0;
+  const total = g + r;
+  if (total > 0) return calcWinRate(g, r);
+
   return null;
 }
 
@@ -94,12 +166,14 @@ export function mapCasinoSignal(row) {
     current_gale: Number(row.current_gale) || 0,
     result,
     result_value: row.result_value,
+    actual_outcome: row.result_value || row.sequence || null,
     scoreboard_green: Number(row.scoreboard_green) || 0,
     scoreboard_red: Number(row.scoreboard_red) || 0,
     win_rate: row.win_rate,
     raw_message: row.raw_text,
     source: 'evolution_casino',
-    confidence: bet && signalStatus === 'confirmed' ? 92 : null,
+    confidence: resolveIaConfidence(row, signalStatus, bet),
+    ia_assertividade: resolveIaConfidence(row, signalStatus, bet),
     analysis: bet
       ? {
           bet,
@@ -125,10 +199,11 @@ export function shouldShowMonitoring(signal) {
 }
 
 export class CasinoDataProvider {
-  constructor({ onRounds, onSignal, onStatus }) {
+  constructor({ onRounds, onSignal, onStatus, onSyncScoreboard }) {
     this.onRounds = onRounds;
     this.onSignal = onSignal;
     this.onStatus = onStatus;
+    this.onSyncScoreboard = onSyncScoreboard;
     this.seenRoundIds = new Set();
     this.lastSignalId = null;
     this.connected = false;
@@ -148,9 +223,11 @@ export class CasinoDataProvider {
   }
 
   async sync() {
-    const [rounds, signal] = await Promise.all([
+    const [rounds, signal, scoreboard, todayResults] = await Promise.all([
       fetchCasinoRounds(this.gameId, 200),
       fetchLatestCasinoSignal(this.gameId),
+      fetchCasinoScoreboard(this.gameId),
+      fetchTodayResultSignals(this.gameId),
     ]);
 
     if (rounds.length > 0) {
@@ -172,6 +249,9 @@ export class CasinoDataProvider {
     } else {
       this.connected = false;
     }
+
+    // Placar ANTES do sinal — evita flash de valores parciais (2/1/67)
+    this.onSyncScoreboard?.({ casinoScoreboard: scoreboard, todayResults });
 
     if (signal && signal.id !== this.lastSignalId) {
       this.lastSignalId = signal.id;

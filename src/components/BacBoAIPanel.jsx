@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
+import { useMemo } from 'react';
 import { X, Satellite } from 'lucide-react';
 import {
   calculateProbabilities,
@@ -10,6 +11,9 @@ import {
   getColorConfig,
   getGaleProgress,
 } from '../utils/bacBoStats';
+import { normalizeScoreboard } from '../utils/scoreboard';
+import { getPremiumBadge } from '../utils/playResult';
+import { getHistorySummary } from '../utils/signalResult';
 import BacBoLogo from './BacBoLogo';
 import ScoreboardCards from './ScoreboardCards';
 import GaleProgressBars from './GaleProgressBars';
@@ -135,10 +139,27 @@ function Label({ text }) {
   );
 }
 
-/** Cor prevista Evolution Bac Bo — aparece na área de análise */
-function CasinoColorIndicator({ zone, pulsing = false, confirmed = false }) {
+/** Cor Evolution Bac Bo — entrada, acerto ou resultado */
+function CasinoColorIndicator({
+  zone,
+  pulsing = false,
+  confirmed = false,
+  variant = 'prediction',
+  size = 'md',
+}) {
   const cfg = getColorConfig(zone);
   if (!cfg) return null;
+
+  const labels = {
+    prediction: { top: 'PREVISÃO', bottom: cfg.label },
+    bet: { top: 'APOSTAR EM', bottom: cfg.label },
+    win: { top: 'COR ACERTADA', bottom: cfg.label },
+    'loss-bet': { top: 'APOSTOU', bottom: cfg.label },
+    'loss-outcome': { top: 'SAIU', bottom: cfg.label },
+  };
+  const copy = labels[variant] || labels.prediction;
+  const dim = size === 'lg' ? 'w-24 h-24 sm:w-28 sm:h-28' : 'w-20 h-20 sm:w-24 sm:h-24';
+  const emojiSize = size === 'lg' ? 'text-4xl sm:text-5xl' : 'text-3xl sm:text-4xl';
 
   return (
     <motion.div
@@ -147,7 +168,7 @@ function CasinoColorIndicator({ zone, pulsing = false, confirmed = false }) {
       className="flex flex-col items-center gap-2"
     >
       <div className="relative">
-        {pulsing && (
+        {(pulsing || variant === 'win') && (
           <motion.div
             className="absolute inset-0 rounded-full"
             style={{ background: cfg.glow }}
@@ -156,25 +177,94 @@ function CasinoColorIndicator({ zone, pulsing = false, confirmed = false }) {
           />
         )}
         <div
-          className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center border-4 border-white/25"
+          className={`relative ${dim} rounded-full flex items-center justify-center border-4 border-white/25`}
           style={{
             background: cfg.gradient,
             boxShadow: `0 0 32px ${cfg.glow}, inset 0 2px 8px rgba(255,255,255,0.25)`,
           }}
         >
-          <span className="text-3xl sm:text-4xl drop-shadow-lg">{cfg.emoji}</span>
+          <span className={`${emojiSize} drop-shadow-lg`}>{cfg.emoji}</span>
         </div>
       </div>
       <div className="text-center">
-        <p className="text-white font-black text-sm sm:text-base tracking-wide">
-          {confirmed ? 'APOSTAR EM' : 'PREVISÃO'}
+        <p className="text-white/70 font-black text-[10px] sm:text-xs tracking-[0.2em] uppercase">
+          {variant === 'bet' && confirmed ? 'APOSTAR EM' : copy.top}
         </p>
         <p
           className="font-black text-lg sm:text-xl tracking-wider"
           style={{ color: cfg.hex, textShadow: `0 0 20px ${cfg.glow}` }}
         >
-          {cfg.emoji} {cfg.label}
+          {cfg.emoji} {copy.bottom}
         </p>
+      </div>
+    </motion.div>
+  );
+}
+
+function ResultDetails({ signal, compact = false }) {
+  const { bet, outcome, galeLine, styles, isGreen, highlight } = getHistorySummary(signal);
+
+  if (compact) {
+    return (
+      <motion.p
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={`text-center text-[10px] font-bold uppercase tracking-wider ${styles.text}`}
+      >
+        {galeLine}
+      </motion.p>
+    );
+  }
+
+  if (isGreen && highlight) {
+    return (
+      <motion.p
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={`text-center text-[10px] font-bold uppercase tracking-wider ${styles.text}`}
+      >
+        {galeLine} · {highlight.emoji} {highlight.label}
+      </motion.p>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mt-3 w-full max-w-xs space-y-2"
+    >
+      <p className={`text-center text-[10px] font-bold uppercase tracking-wider ${styles.text}`}>
+        {galeLine}
+      </p>
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        {bet && (
+          <span
+            className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black border"
+            style={{
+              color: bet.hex,
+              borderColor: `${bet.hex}55`,
+              backgroundColor: `${bet.hex}18`,
+            }}
+          >
+            {bet.emoji} Apostou {bet.label}
+          </span>
+        )}
+        {outcome && (
+          <>
+            <span className="text-zinc-600 text-[10px]">→</span>
+            <span
+              className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black border"
+              style={{
+                color: outcome.hex,
+                borderColor: `${outcome.hex}55`,
+                backgroundColor: `${outcome.hex}18`,
+              }}
+            >
+              {outcome.emoji} Saiu {outcome.label}
+            </span>
+          </>
+        )}
       </div>
     </motion.div>
   );
@@ -192,8 +282,10 @@ function StatusPanel({
   signal,
   galeProgress,
 }) {
-  const showColor = predictedZone && !showMonitoring;
-  const showSatellite = showMonitoring || (isAnalyzing && !predictedZone);
+  const resultSummary = signal && (isSuccess || isLoss) ? getHistorySummary(signal) : null;
+  const showColor = predictedZone && !showMonitoring && !isSuccess && !isLoss;
+  const showSatellite =
+    (showMonitoring || (isAnalyzing && !predictedZone)) && !isSuccess && !isLoss;
 
   return (
     <div
@@ -207,7 +299,40 @@ function StatusPanel({
         {/* Área principal: cor do casino OU satélite */}
         <div className="relative mb-4 min-h-[120px] flex items-center justify-center">
           <AnimatePresence mode="wait">
-            {showColor ? (
+            {isSuccess && resultSummary?.highlightZone ? (
+              <motion.div
+                key={`win-${resultSummary.highlightZone}`}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+              >
+                <CasinoColorIndicator
+                  zone={resultSummary.highlightZone}
+                  variant="win"
+                  size="lg"
+                />
+              </motion.div>
+            ) : isLoss && resultSummary?.bet?.zone ? (
+              <motion.div
+                key={`loss-${resultSummary.bet.zone}-${resultSummary.outcome?.zone}`}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="flex items-center gap-4 sm:gap-6"
+              >
+                <CasinoColorIndicator
+                  zone={resultSummary.bet.zone}
+                  variant="loss-bet"
+                />
+                <span className="text-zinc-600 text-xl font-light">→</span>
+                {resultSummary.outcome?.zone ? (
+                  <CasinoColorIndicator
+                    zone={resultSummary.outcome.zone}
+                    variant="loss-outcome"
+                  />
+                ) : null}
+              </motion.div>
+            ) : showColor ? (
               <motion.div
                 key={`color-${predictedZone}`}
                 initial={{ opacity: 0, scale: 0.9 }}
@@ -264,14 +389,26 @@ function StatusPanel({
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
-            className={`font-black text-lg sm:text-xl tracking-wide uppercase text-center ${
-              isSuccess ? 'text-green-400' : isLoss ? 'text-red-400' : 'text-white'
+            className={`font-black tracking-[0.12em] uppercase text-center ${
+              isSuccess
+                ? 'text-2xl sm:text-3xl text-emerald-400'
+                : isLoss
+                  ? 'text-xl sm:text-2xl text-red-400'
+                  : 'text-lg sm:text-xl text-white'
             }`}
-            style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}
+            style={{
+              textShadow: isSuccess
+                ? '0 0 28px rgba(16,185,129,0.45)'
+                : '0 2px 10px rgba(0,0,0,0.5)',
+            }}
           >
             {main}
           </motion.h2>
         </AnimatePresence>
+
+        {(isSuccess || isLoss) && signal && (
+          <ResultDetails signal={signal} compact={isSuccess} />
+        )}
 
         {isAnalyzing && !showColor && (
           <div className="flex gap-1 mt-3">
@@ -298,6 +435,7 @@ export default function BacBoAIPanel({
   onClose,
   compact = false,
   casinoConnected = true,
+  wsConnected = true,
 }) {
   const probs = calculateProbabilities(rounds);
   const percents = getDisplayPercents(signal, probs);
@@ -316,6 +454,9 @@ export default function BacBoAIPanel({
   const isResult = signal?.signal_status === 'result';
   const isSuccess = isResult && signal.result === 'green';
   const isLoss = isResult && signal.result === 'loss';
+
+  const stats = useMemo(() => normalizeScoreboard(scoreboard), [scoreboard]);
+  const premiumBadge = getPremiumBadge(stats.winRate, stats.playsToday);
 
   return (
     <motion.div
@@ -336,7 +477,12 @@ export default function BacBoAIPanel({
 
       {/* Placar fixo — sempre visível */}
       <div className="px-4 pb-2">
-        <ScoreboardCards scoreboard={scoreboard} variant="panel" />
+        <ScoreboardCards
+          scoreboard={scoreboard}
+          variant="panel"
+          live
+          connected={wsConnected && casinoConnected}
+        />
       </div>
 
       <div className="relative px-4 pt-1 pb-3">
@@ -352,6 +498,20 @@ export default function BacBoAIPanel({
           <p className="text-center text-emerald-300/60 text-[10px] mt-3 px-3 italic">
             {signal.reason}
           </p>
+        )}
+
+        {isConfirmed && stats.playsToday > 0 && (
+          <div className="flex justify-center mt-2">
+            <span
+              className={`text-[9px] font-bold px-2.5 py-0.5 rounded-full border ${
+                stats.meetsTarget
+                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
+                  : 'bg-zinc-800/80 text-zinc-400 border-zinc-700'
+              }`}
+            >
+              {premiumBadge.text}
+            </span>
+          </div>
         )}
 
         {isConfirmed && signal?.tie_protection && (

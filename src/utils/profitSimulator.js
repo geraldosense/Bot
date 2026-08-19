@@ -1,20 +1,14 @@
-/** Simulador de lucro diário — baseado em greens/losses e valor da aposta (estilo moneytix) */
+/** Simulador — perda só após falhar no 3° gale */
 
-const BACBO_AVG_PAYOUT = 0.95; // média Player 1:1 / Banker 0.95:1
+import { MAX_GALES, galeLossMultiplier } from './playResult.js';
 
-/** Custo máximo num loss com gales (1 + 2 + 4 + …) */
-export function galeLossMultiplier(maxGales = 2) {
-  const gales = Math.max(0, Math.min(maxGales, 3));
-  let total = 0;
-  for (let i = 0; i <= gales; i++) total += Math.pow(2, i);
-  return total;
-}
+const BACBO_AVG_PAYOUT = 0.95;
 
 export function calculateDailyProfit({
   greens = 0,
   reds = 0,
   baseBet = 10,
-  maxGales = 2,
+  maxGales = MAX_GALES,
 }) {
   const bet = Math.max(0, Number(baseBet) || 0);
   const g = Math.max(0, Number(greens) || 0);
@@ -33,7 +27,7 @@ export function calculateDailyProfit({
   };
 }
 
-export function formatCurrency(value, currency = 'R$') {
+export function formatCurrency(value, currency = '€') {
   const n = Number(value) || 0;
   const sign = n >= 0 ? '+' : '';
   return `${sign}${currency} ${Math.abs(n).toFixed(2).replace('.', ',')}`;

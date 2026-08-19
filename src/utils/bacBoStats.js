@@ -146,6 +146,22 @@ export function getPredictedZone(signal, showMonitoring) {
   return null;
 }
 
+const GALE_LABELS = ['1° GALE', '2° GALE', '3° GALE'];
+export const TOTAL_GALE_ATTEMPTS = GALE_LABELS.length;
+
+/** API usa current_gale 0-based: 0 = 1° gale (entrada), 1 = 2° gale, 2 = 3° gale */
+export function apiGaleToDisplayNumber(apiGale = 0) {
+  return Math.min(TOTAL_GALE_ATTEMPTS, Math.max(1, Number(apiGale) + 1));
+}
+
+export function apiGaleToBarIndex(apiGale = 0) {
+  return Math.min(TOTAL_GALE_ATTEMPTS - 1, Math.max(0, Number(apiGale) || 0));
+}
+
+export function formatGaleLabel(apiGale = 0) {
+  return `${apiGaleToDisplayNumber(apiGale)}° GALE`;
+}
+
 export function getStatusLabel(signal, showMonitoring) {
   if (showMonitoring || !signal) {
     return { sub: 'AGUARDANDO', main: 'ANALISANDO' };
@@ -154,18 +170,20 @@ export function getStatusLabel(signal, showMonitoring) {
     return { sub: 'PROCESSANDO', main: 'ANALISANDO' };
   }
   if (signal.signal_status === 'confirmed') {
-    return { sub: 'SINAL ATIVO', main: 'ENTRADA CONFIRMADA' };
+    return { sub: '1° GALE', main: 'ENTRADA CONFIRMADA' };
   }
   if (signal.signal_status === 'gale_update') {
+    const apiGale = Number(signal.current_gale) || 0;
     return {
-      sub: `${signal.current_gale}° GALE`,
+      sub: formatGaleLabel(apiGale),
       main: 'MANTER A MESMA COR',
     };
   }
   if (signal.signal_status === 'result') {
+    const green = String(signal.result || '').toLowerCase() === 'green';
     return {
       sub: 'RESULTADO',
-      main: signal.result === 'green' ? 'GREEN ✅' : 'LOSS ❌',
+      main: green ? 'ACERTADO' : 'PERDIDO',
     };
   }
   return { sub: 'AGUARDANDO', main: 'ANALISANDO' };
@@ -175,9 +193,7 @@ export function getColorConfig(zone) {
   return BACBO_COLORS[zone] || null;
 }
 
-const GALE_LABELS = ['ENTRADA', '1° GALE', '2° GALE'];
-
-/** Estado das 3 barras de gale — alinhado com moneytix (entrada + 2 gales) */
+/** Estado das 3 barras — entrada = 1° gale, depois 2° e 3° gale */
 export function getGaleProgress(signal) {
   if (!signal || !['confirmed', 'gale_update', 'result'].includes(signal.signal_status)) {
     return null;
@@ -192,12 +208,13 @@ export function getGaleProgress(signal) {
   if (signal.signal_status === 'confirmed') {
     activeIndex = 0;
   } else if (signal.signal_status === 'gale_update') {
-    activeIndex = Math.min(2, Math.max(1, currentGale || 1));
+    activeIndex = apiGaleToBarIndex(currentGale);
   } else if (signal.signal_status === 'result') {
+    const idx = apiGaleToBarIndex(currentGale);
     if (signal.result === 'green') {
-      activeIndex = Math.min(2, currentGale);
+      activeIndex = idx;
     } else {
-      failedIndex = Math.min(2, currentGale);
+      failedIndex = idx;
     }
   }
 

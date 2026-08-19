@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { mergeScoreboard, normalizeScoreboard } from '../utils/scoreboard';
-import { loadScoreboard, saveScoreboard, scoreboardFromSignal } from '../utils/scoreboardStorage';
+import { normalizeScoreboard } from '../utils/scoreboard';
 
 const GAME_ID = 'bac_bo';
 
@@ -11,17 +10,37 @@ function getWsUrl(token) {
   return `${proto}://${host}?token=${encodeURIComponent(token)}`;
 }
 
-function resolveScoreboard(ref, incoming) {
-  const merged = mergeScoreboard(ref.current, incoming);
-  ref.current = merged;
-  saveScoreboard(GAME_ID, merged);
-  return merged;
+/** Nunca regredir placar — só actualiza com totais iguais ou superiores da IA */
+function applyServerScoreboard(ref, incoming) {
+  if (!incoming) return ref.current;
+
+  const next = normalizeScoreboard(incoming);
+  const prev = ref.current;
+  const prevTotal = prev.greens + prev.reds;
+  const nextTotal = next.greens + next.reds;
+
+  if (next.source === 'casino_ia' && nextTotal > 0) {
+    ref.current = next;
+    return next;
+  }
+
+  if (nextTotal >= prevTotal && nextTotal > 0) {
+    ref.current = next;
+    return next;
+  }
+
+  if (prevTotal > 0 && nextTotal < prevTotal) {
+    return prev;
+  }
+
+  ref.current = next;
+  return next;
 }
 
 export function useWebSocket() {
   const { token, isVip } = useAuth();
   const wsRef = useRef(null);
-  const scoreboardRef = useRef(loadScoreboard(GAME_ID) || normalizeScoreboard());
+  const scoreboardRef = useRef(normalizeScoreboard());
   const [connected, setConnected] = useState(false);
   const [snapshot, setSnapshot] = useState({
     state: 'idle',
@@ -30,7 +49,7 @@ export function useWebSocket() {
     monitoring: true,
     rounds: [],
     history: [],
-    scoreboard: scoreboardRef.current,
+    scoreboard: normalizeScoreboard(),
     casinoConnected: false,
     dataSource: 'evolution_casino',
     gameId: GAME_ID,
@@ -42,6 +61,25 @@ export function useWebSocket() {
   const patchSnapshot = useCallback((patch) => {
     setSnapshot((prev) => ({ ...prev, ...patch }));
   }, []);
+
+  const applyScoreboard = useCallback((incoming) => {
+    return applyServerScoreboard(scoreboardRef, incoming);
+  }, []);
+
+  useEffect(() => {
+    if (!token || !isVip) return;
+
+    fetch('/api/scoreboard', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data) {
+          patchSnapshot({ scoreboard: applyScoreboard(data) });
+        }
+      })
+      .catch(() => {});
+  }, [token, isVip, applyScoreboard, patchSnapshot]);
 
   const connect = useCallback(() => {
     if (!token || !isVip) return;
@@ -75,10 +113,7 @@ export function useWebSocket() {
           case 'snapshot':
             setSnapshot((prev) => ({
               ...msg.data,
-              scoreboard: resolveScoreboard(
-                scoreboardRef,
-                msg.data.scoreboard || scoreboardFromSignal(msg.data.rawSignal),
-              ),
+              scoreboard: applyScoreboard(msg.data.scoreboard),
               gameId: GAME_ID,
             }));
             break;
@@ -88,10 +123,7 @@ export function useWebSocket() {
               state: msg.data.state,
               signal: msg.data.signal ?? prev.signal,
               monitoring: msg.data.monitoring ?? prev.monitoring,
-              scoreboard: resolveScoreboard(
-                scoreboardRef,
-                msg.data.scoreboard || scoreboardFromSignal(msg.data.signal),
-              ),
+              scoreboard: applyScoreboard(msg.data.scoreboard),
               casinoConnected: msg.data.casinoConnected ?? prev.casinoConnected,
             }));
             break;
@@ -101,20 +133,14 @@ export function useWebSocket() {
           case 'rounds':
             patchSnapshot({ rounds: msg.data });
             break;
-          case 'signal': {
-            const fromSignal =
-              msg.data.scoreboard || scoreboardFromSignal(msg.data);
+          case 'signal':
             setLastSignal(msg.data);
             setSnapshot((prev) => ({
               ...prev,
               rawSignal: msg.data,
               signal: msg.data,
-              scoreboard: fromSignal
-                ? resolveScoreboard(scoreboardRef, fromSignal)
-                : prev.scoreboard,
             }));
             break;
-          }
           case 'casino_status':
             setSnapshot((prev) => ({
               ...prev,
@@ -125,6 +151,9 @@ export function useWebSocket() {
           case 'history':
             patchSnapshot({ history: msg.data });
             break;
+          case 'scoreboard':
+            patchSnapshot({ scoreboard: applyScoreboard(msg.data) });
+            break;
           default:
             break;
         }
@@ -132,7 +161,7 @@ export function useWebSocket() {
         /* ignore */
       }
     };
-  }, [token, isVip, patchSnapshot]);
+  }, [token, isVip, patchSnapshot, applyScoreboard]);
 
   useEffect(() => {
     if (!token || !isVip) {

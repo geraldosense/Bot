@@ -2,15 +2,13 @@ import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Wifi, WifiOff } from 'lucide-react';
 import { useWebSocket } from '../hooks/useWebSocket';
-import BacBoAIPanel from '../components/BacBoAIPanel';
 import HistoryGrid from '../components/HistoryGrid';
 import SignalHistory from '../components/SignalHistory';
 import BottomNav from '../components/BottomNav';
 import SenseBotLogo from '../components/SenseBotLogo';
 import GameCard from '../components/GameCard';
-import ScoreboardCards from '../components/ScoreboardCards';
-import DailyProfitSimulator from '../components/DailyProfitSimulator';
-import { normalizeScoreboard } from '../utils/scoreboard';
+import DailyScoreboardPanel from '../components/DailyScoreboardPanel';
+import { normalizeScoreboard, formatWinRate } from '../utils/scoreboard';
 
 const GAMES = [
   {
@@ -63,13 +61,11 @@ const CATEGORIES = ['all', 'Cartas', 'Crash', 'Roleta'];
 const PLACEHOLDER_SCORE = normalizeScoreboard();
 
 export default function Dashboard() {
-  const { connected, snapshot, forceAnalyze } = useWebSocket();
+  const { connected, snapshot } = useWebSocket();
   const [selectedGame, setSelectedGame] = React.useState(GAMES[0]);
   const [category, setCategory] = React.useState('all');
   const [tab, setTab] = React.useState('sinais');
 
-  const showMonitoring = snapshot.monitoring ?? !snapshot.signal;
-  const activeSignal = snapshot.rawSignal || snapshot.signal;
   const isLiveGame = selectedGame.type === 'bacbo' && !selectedGame.disabled;
 
   const displayScoreboard = useMemo(
@@ -77,7 +73,7 @@ export default function Dashboard() {
     [isLiveGame, snapshot.scoreboard],
   );
 
-  const maxGales = activeSignal?.gales ?? 2;
+  const maxGales = snapshot.rawSignal?.gales ?? snapshot.signal?.gales ?? 2;
 
   const filteredGames = GAMES.filter(
     (g) => category === 'all' || g.category === category,
@@ -113,16 +109,11 @@ export default function Dashboard() {
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-4 space-y-4">
-        {/* Placar do casino seleccionado — estável, IA moneytix */}
-        <ScoreboardCards
+        {/* Placar diário — estilo moneytix, histórico do robô */}
+        <DailyScoreboardPanel
           scoreboard={displayScoreboard}
-          variant="dashboard"
           gameName={selectedGame.name}
-          live={isLiveGame}
-        />
-
-        <DailyProfitSimulator
-          scoreboard={displayScoreboard}
+          live={isLiveGame && connected && snapshot.casinoConnected}
           maxGales={maxGales}
           disabled={!isLiveGame}
         />
@@ -152,6 +143,11 @@ export default function Dashboard() {
                 game={game}
                 selected={selectedGame.id === game.id}
                 onSelect={setSelectedGame}
+                liveAssertivity={
+                  game.type === 'bacbo' && displayScoreboard.meetsTarget
+                    ? formatWinRate(displayScoreboard.winRate)
+                    : null
+                }
               />
             ))}
           </div>
@@ -174,36 +170,27 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Content */}
+        {/* Tab Sinais — só histórico + botão para o robô completo */}
         {tab === 'sinais' && isLiveGame && (
           <div className="space-y-4">
-            <BacBoAIPanel
-              signal={activeSignal}
-              showMonitoring={showMonitoring}
-              rounds={snapshot.rounds}
-              scoreboard={displayScoreboard}
-              casinoConnected={snapshot.casinoConnected}
-              compact
-            />
+            <SignalHistory history={snapshot.history} />
 
-            <div className="flex gap-2">
-              <Link
-                to="/BacBo"
-                className="flex-1 text-center py-3 rounded-xl text-white font-bold text-sm hover:opacity-90 transition-opacity"
-                style={{
-                  background: 'linear-gradient(135deg, #14532D, #052E16)',
-                  boxShadow: '0 4px 16px rgba(20, 83, 45, 0.4)',
-                }}
-              >
-                Abrir Bac Bo Completo →
-              </Link>
-              <button
-                onClick={forceAnalyze}
-                className="px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-zinc-300 text-sm font-bold hover:bg-zinc-700 transition-colors"
-              >
-                Analisar
-              </button>
-            </div>
+            {!snapshot.history?.length && (
+              <p className="text-center text-zinc-500 text-xs py-4">
+                A aguardar resultados ao vivo…
+              </p>
+            )}
+
+            <Link
+              to="/BacBo"
+              className="block w-full text-center py-3.5 rounded-xl text-white font-bold text-sm hover:opacity-90 transition-opacity"
+              style={{
+                background: 'linear-gradient(135deg, #14532D, #052E16)',
+                boxShadow: '0 4px 16px rgba(20, 83, 45, 0.4)',
+              }}
+            >
+              Abrir robô do Bac Bo
+            </Link>
           </div>
         )}
 
@@ -231,7 +218,21 @@ export default function Dashboard() {
           </div>
         )}
 
-        {tab === 'historico' && isLiveGame && <SignalHistory history={snapshot.history} />}
+        {tab === 'historico' && isLiveGame && (
+          <div className="space-y-4">
+            <SignalHistory history={snapshot.history} title="HISTÓRICO COMPLETO" limit={50} />
+            <Link
+              to="/BacBo"
+              className="block w-full text-center py-3.5 rounded-xl text-white font-bold text-sm hover:opacity-90 transition-opacity"
+              style={{
+                background: 'linear-gradient(135deg, #14532D, #052E16)',
+                boxShadow: '0 4px 16px rgba(20, 83, 45, 0.4)',
+              }}
+            >
+              Abrir robô do Bac Bo
+            </Link>
+          </div>
+        )}
 
         {tab === 'historico' && !isLiveGame && (
           <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-8 text-center text-zinc-500 text-sm">

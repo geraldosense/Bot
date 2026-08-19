@@ -1,6 +1,6 @@
-# Bac Bo Bot
+# Sense Bot — Bac Bo
 
-Fork completo inspirado no [moneytix01.com/Dashboard](https://moneytix01.com/Dashboard) com robô de análise Bac Bo em tempo real.
+Robô de análise Bac Bo em tempo real com sinais, placar diário, catalogador e dashboard VIP.
 
 ## Funcionalidades
 
@@ -21,11 +21,25 @@ npm run dev
 - Frontend: http://localhost:5173
 - Backend + WebSocket: http://localhost:3001
 
-## Produção
+## Go Live / Produção
+
+```bash
+npm run go-live
+```
+
+Abre tudo em **http://localhost:3001** (build + servidor + WebSocket no mesmo URL).
+
+Alternativa manual:
 
 ```bash
 npm run build
 npm start
+```
+
+Dev com browser automático:
+
+```bash
+npm run go-live:dev
 ```
 
 ## Autenticação e VIP
@@ -50,7 +64,7 @@ Variáveis de ambiente (recomendado alterar):
 
 ```bash
 SUPER_ADMIN_EMAIL=teu@email.com
-SUPER_ADMIN_PASSWORD= tua_password_segura
+SUPER_ADMIN_PASSWORD=tua_password_segura
 JWT_SECRET=chave-secreta-longa
 ```
 
@@ -69,9 +83,9 @@ Variáveis de ambiente opcionais:
 | Variável | Default | Descrição |
 |----------|---------|-----------|
 | `PORT` | 3001 | Porta do servidor |
-| `DATA_MODE` | casino | Sempre Evolution (Supabase) — simulador removido |
-| `SUPABASE_URL` | moneytix Supabase | URL dos rounds ao vivo |
-| `SUPABASE_KEY` | chave publishable | API do casino |
+| `SUPABASE_URL` | — | URL Supabase dos rounds Evolution Bac Bo |
+| `SUPABASE_KEY` | — | Chave API do casino |
+| `BACBO_GAME_ID` | bac_bo | ID do jogo na base de dados |
 
 ## Estratégias do Robô
 
@@ -85,12 +99,12 @@ Variáveis de ambiente opcionais:
 
 ```
 server/
-  analyzer.js      — motor de análise
-  signalEngine.js  — gestão de sinais e gales
-  dataProvider.js  — fonte de dados (simulador/supabase)
-  index.js         — Express + WebSocket
+  analyzer.js           — motor de análise
+  signalEngine.js       — gestão de sinais e gales
+  casinoDataProvider.js — dados Evolution via Supabase
+  scoreboardStore.js    — placar diário persistente
+  index.js              — Express + WebSocket
 src/
-  pages/           — Dashboard, BacBo
-  components/      — UI de sinais, catalogador, mesa
+  pages/                — Dashboard, BacBo, Auth, Admin
+  components/           — UI de sinais, catalogador, mesa
 ```
-# Bot

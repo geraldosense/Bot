@@ -2,7 +2,15 @@ import { motion } from 'framer-motion';
 import { CheckCircle, Shield, Zap, TrendingUp } from 'lucide-react';
 import BacBoTable from './BacBoTable';
 import { formatTime } from '../hooks/useWebSocket';
-import { getEntryZone, betToZone } from '../utils/bacBoStats';
+import { getEntryZone, betToZone, formatGaleLabel, TOTAL_GALE_ATTEMPTS } from '../utils/bacBoStats';
+import {
+  getResultLabel,
+  getResultStyles,
+  getSignalBetColor,
+  getSignalOutcomeColor,
+  getGaleResultLine,
+  isSignalGreen,
+} from '../utils/signalResult';
 
 export default function SignalCard({ signal }) {
   if (!signal) return null;
@@ -28,27 +36,56 @@ export default function SignalCard({ signal }) {
   const betZone = getEntryZone(signal) || betToZone(signal.bet_recommendation || signal.bet);
   const isGale = signal.signal_status === 'gale_update';
   const isResult = signal.signal_status === 'result';
-  const isGreen = signal.result === 'green';
+  const isGreen = isSignalGreen(signal);
+  const resultStyles = getResultStyles(signal);
+  const betColor = getSignalBetColor(signal);
+  const outcomeColor = getSignalOutcomeColor(signal);
 
   if (isResult) {
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className={`relative overflow-hidden rounded-2xl p-6 border-2 ${
-          isGreen
-            ? 'bg-gradient-to-br from-green-900/30 to-emerald-900/20 border-green-500/60'
-            : 'bg-gradient-to-br from-red-900/30 to-rose-900/20 border-red-500/60'
-        }`}
+        className={`relative overflow-hidden rounded-2xl p-6 border-2 ${resultStyles.bg} ${resultStyles.border} ${resultStyles.glow}`}
       >
-        <div className="text-center space-y-3">
-          <span className="text-5xl">{isGreen ? '✅' : '❌'}</span>
-          <h3 className={`font-black text-2xl ${isGreen ? 'text-green-400' : 'text-red-400'}`}>
-            {isGreen ? 'GREEN' : 'LOSS'}
+        <div className="text-center space-y-4">
+          <div
+            className={`inline-flex items-center justify-center w-16 h-16 rounded-full border-2 ${resultStyles.badge}`}
+          >
+            <span className="text-3xl">{isGreen ? '✓' : '✕'}</span>
+          </div>
+          <h3 className={`font-black text-3xl tracking-[0.15em] uppercase ${resultStyles.text}`}>
+            {getResultLabel(signal)}
           </h3>
-          <p className="text-zinc-300 text-sm">
-            Saiu: <span className="font-bold">{signal.result_value || signal.sequence}</span>
+          <p className="text-zinc-400 text-xs font-bold uppercase tracking-wider">
+            {getGaleResultLine(signal)}
           </p>
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+            {betColor && (
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-black border"
+                style={{
+                  color: betColor.hex,
+                  borderColor: `${betColor.hex}55`,
+                  backgroundColor: `${betColor.hex}18`,
+                }}
+              >
+                {betColor.emoji} Apostou {betColor.label}
+              </span>
+            )}
+            {outcomeColor && (
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-black border"
+                style={{
+                  color: outcomeColor.hex,
+                  borderColor: `${outcomeColor.hex}55`,
+                  backgroundColor: `${outcomeColor.hex}18`,
+                }}
+              >
+                {outcomeColor.emoji} Saiu {outcomeColor.label}
+              </span>
+            )}
+          </div>
         </div>
       </motion.div>
     );
@@ -74,7 +111,9 @@ export default function SignalCard({ signal }) {
             </div>
             <div>
               <h3 className="text-green-300 font-bold text-sm">
-                {isGale ? `${signal.current_gale}° GALE — ENTRADA CONFIRMADA` : 'ENTRADA CONFIRMADA'}
+                {isGale
+                  ? `${formatGaleLabel(signal.current_gale)} — MANTER A MESMA COR`
+                  : '1° GALE — ENTRADA CONFIRMADA'}
               </h3>
               <p className="text-[10px] text-green-500">{formatTime(signal.created_date)}</p>
             </div>
@@ -106,14 +145,12 @@ export default function SignalCard({ signal }) {
               <span className="text-yellow-300 text-[10px] font-bold">COBRIR EMPATE</span>
             </div>
           )}
-          {signal.gales > 0 && (
-            <div className="bg-purple-500/15 border border-purple-500/40 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5">
-              <Zap className="w-3 h-3 text-purple-400" />
-              <span className="text-purple-300 text-[10px] font-bold">
-                ATÉ {signal.gales} GALE{signal.gales > 1 ? 'S' : ''}
-              </span>
-            </div>
-          )}
+          <div className="bg-purple-500/15 border border-purple-500/40 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5">
+            <Zap className="w-3 h-3 text-purple-400" />
+            <span className="text-purple-300 text-[10px] font-bold">
+              1° AO {TOTAL_GALE_ATTEMPTS}° GALE
+            </span>
+          </div>
         </div>
       </div>
     </motion.div>

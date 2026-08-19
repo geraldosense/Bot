@@ -1,0 +1,48 @@
+/** Regras de gale — 1° gale = entrada, depois 2° e 3° gale */
+
+export const MAX_GALES = 2;
+export const GALE_ATTEMPTS = MAX_GALES + 1;
+
+export function calcWinRate(greens, reds) {
+  const g = Math.max(0, Number(greens) || 0);
+  const r = Math.max(0, Number(reds) || 0);
+  const total = g + r;
+  if (!total) return 0;
+  const rate = (g / total) * 100;
+  return Math.min(100, Math.round(rate * 100) / 100);
+}
+
+export function getPremiumBadge(winRate, totalPlays = 0) {
+  const rate = Number.isFinite(Number(winRate)) ? Number(winRate) : 0;
+  const plays = Number(totalPlays) || 0;
+
+  if (plays > 0 && rate >= 90) {
+    return {
+      meetsTarget: true,
+      text: '✓ IA Premium · Meta 90%+ atingida',
+      subtext: `${rate.toFixed(2)}% acertividade diária`,
+    };
+  }
+
+  if (plays > 0) {
+    return {
+      meetsTarget: false,
+      text: `IA Premium · ${rate.toFixed(2)}% acertividade diária`,
+      subtext: 'Meta operacional: 90%+',
+    };
+  }
+
+  return {
+    meetsTarget: false,
+    text: 'IA Premium · A recolher histórico do dia',
+    subtext: null,
+  };
+}
+
+/** Custo de uma perda definitiva — 1° + 2° + 3° gale (martingale 1+2+4) */
+export function galeLossMultiplier(maxGales = MAX_GALES) {
+  const gales = Math.max(0, Math.min(maxGales, MAX_GALES));
+  let total = 0;
+  for (let i = 0; i <= gales; i++) total += Math.pow(2, i);
+  return total;
+}
