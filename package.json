@@ -9,13 +9,13 @@
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "node server/index.js",
-    "dev:client": "./node_modules/.bin/vite --host",
-    "build": "./node_modules/.bin/vite build",
+    "dev:client": "vite --host",
+    "build": "vite build",
     "start": "node server/index.js",
     "live": "npm run build && node server/index.js",
     "go-live": "node scripts/go-live.mjs",
     "go-live:dev": "node scripts/go-live-dev.mjs",
-    "preview": "./node_modules/.bin/vite preview --host"
+    "preview": "vite preview --host"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
