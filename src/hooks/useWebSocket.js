@@ -37,7 +37,15 @@ function applyServerScoreboard(ref, incoming) {
   return next;
 }
 
-export function useWebSocket() {
+export function useWebSocket(options = {}) {
+  const { onPlayResult, onSnapshot } = options;
+  const onPlayResultRef = useRef(onPlayResult);
+  const onSnapshotRef = useRef(onSnapshot);
+
+  useEffect(() => {
+    onPlayResultRef.current = onPlayResult;
+    onSnapshotRef.current = onSnapshot;
+  }, [onPlayResult, onSnapshot]);
   const { token, isVip } = useAuth();
   const wsRef = useRef(null);
   const scoreboardRef = useRef(normalizeScoreboard());
@@ -116,6 +124,7 @@ export function useWebSocket() {
               scoreboard: applyScoreboard(msg.data.scoreboard),
               gameId: GAME_ID,
             }));
+            onSnapshotRef.current?.(msg.data);
             break;
           case 'state':
             setSnapshot((prev) => ({
@@ -140,6 +149,9 @@ export function useWebSocket() {
               rawSignal: msg.data,
               signal: msg.data,
             }));
+            break;
+          case 'play_result':
+            onPlayResultRef.current?.(msg.data);
             break;
           case 'casino_status':
             setSnapshot((prev) => ({

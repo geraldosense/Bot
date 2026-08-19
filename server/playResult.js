@@ -32,6 +32,37 @@ export function isPlayGreen(signal) {
   return classifyPlayResult(signal) === 'green';
 }
 
+/** Etiqueta do gale — API usa current_gale 0-based */
+export function formatGaleLabel(apiGale = 0) {
+  const n = Math.max(0, Math.min(Number(apiGale) || 0, MAX_GALES));
+  return `${n + 1}° GALE`;
+}
+
+export function buildPlayResultAlert(signal, outcome) {
+  if (!signal || !outcome) return null;
+
+  const galeLabel = formatGaleLabel(signal.current_gale);
+  const bet = String(signal.bet_recommendation || signal.bet || signal.entry_bet || '').toUpperCase();
+
+  if (outcome === 'green') {
+    return {
+      outcome: 'green',
+      title: 'ACERTOU',
+      message: `Sinal confirmado — ${galeLabel}`,
+      sub: bet ? `Cor: ${bet}` : null,
+      galeLabel,
+    };
+  }
+
+  return {
+    outcome: 'loss',
+    title: 'PERDEU',
+    message: `Errou nos ${GALE_ATTEMPTS} gales`,
+    sub: bet ? `Entrada: ${bet}` : 'Todos os gales esgotados',
+    galeLabel,
+  };
+}
+
 /** Acertividade diária — 2 casas decimais, sempre coerente com verdes/perdas */
 export function calcWinRate(greens, reds) {
   const g = Math.max(0, Number(greens) || 0);

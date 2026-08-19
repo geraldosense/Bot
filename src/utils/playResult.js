@@ -3,6 +3,35 @@
 export const MAX_GALES = 2;
 export const GALE_ATTEMPTS = MAX_GALES + 1;
 
+export function classifyPlayResult(signal) {
+  if (!signal || signal.signal_status !== 'result') return null;
+
+  const result = String(signal.result || '').toLowerCase();
+  if (result === 'green') return 'green';
+
+  if (result === 'loss' || result === 'red') {
+    const maxGales = Number.isFinite(Number(signal.gales)) ? Number(signal.gales) : MAX_GALES;
+    const currentGale = Number(signal.current_gale) || 0;
+    if (currentGale >= maxGales) return 'loss';
+    return null;
+  }
+
+  return null;
+}
+
+export function isDefinitiveLoss(signal) {
+  return classifyPlayResult(signal) === 'loss';
+}
+
+export function isPlayGreen(signal) {
+  return classifyPlayResult(signal) === 'green';
+}
+
+export function formatGaleLabel(apiGale = 0) {
+  const n = Math.max(0, Math.min(Number(apiGale) || 0, MAX_GALES));
+  return `${n + 1}° GALE`;
+}
+
 export function calcWinRate(greens, reds) {
   const g = Math.max(0, Number(greens) || 0);
   const r = Math.max(0, Number(reds) || 0);

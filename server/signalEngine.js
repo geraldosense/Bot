@@ -1,5 +1,6 @@
 import { shouldShowMonitoring } from './casinoDataProvider.js';
 import { scoreboardStore } from './scoreboardStore.js';
+import { classifyPlayResult, buildPlayResultAlert } from './playResult.js';
 
 /**
  * Motor de sinais — dados reais Evolution Bac Bo.
@@ -148,6 +149,15 @@ export class SignalEngine {
         this.signalHistory.unshift({ ...this.currentSignal });
         if (this.signalHistory.length > 50) this.signalHistory.pop();
         this.emit('history', this.signalHistory);
+
+        const outcome = classifyPlayResult(this.currentSignal);
+        if (outcome) {
+          this.emit('play_result', {
+            outcome,
+            signal: this.currentSignal,
+            alert: buildPlayResultAlert(this.currentSignal, outcome),
+          });
+        }
       }
     }
 
