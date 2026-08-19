@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Wifi, WifiOff } from 'lucide-react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import HistoryGrid from '../components/HistoryGrid';
@@ -63,11 +63,20 @@ const CATEGORIES = ['all', 'Cartas', 'Crash', 'Roleta'];
 const PLACEHOLDER_SCORE = normalizeScoreboard();
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { connected, snapshot } = useWebSocket();
   const { user, isVip } = useAuth();
   const [selectedGame, setSelectedGame] = React.useState(GAMES[0]);
   const [category, setCategory] = React.useState('all');
   const [tab, setTab] = React.useState('sinais');
+
+  const handleGameSelect = (game) => {
+    if (game.disabled) return;
+    setSelectedGame(game);
+    if (game.type === 'bacbo' && game.path) {
+      if (isVip) navigate(game.path);
+    }
+  };
 
   const isLiveGame = selectedGame.type === 'bacbo' && !selectedGame.disabled;
 
@@ -146,7 +155,8 @@ export default function Dashboard() {
                 key={game.id}
                 game={game}
                 selected={selectedGame.id === game.id}
-                onSelect={setSelectedGame}
+                onSelect={handleGameSelect}
+                opensRobot={game.type === 'bacbo' && !game.disabled && isVip}
                 liveAssertivity={
                   game.type === 'bacbo' && displayScoreboard.meetsTarget
                     ? formatWinRate(displayScoreboard.winRate)
@@ -201,7 +211,7 @@ export default function Dashboard() {
               disponível em breve.
             </p>
             <p className="text-zinc-600 text-xs mt-2">
-              Seleccione Bac Bo para sinais ao vivo da mesa Evolution.
+              Selecione Bac Bo para sinais ao vivo da mesa Evolution.
             </p>
           </div>
         )}

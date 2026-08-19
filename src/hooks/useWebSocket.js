@@ -208,7 +208,7 @@ export function useWebSocket(options = {}) {
 export function formatTime(dateStr) {
   if (!dateStr) return '--:--';
   try {
-    return new Date(dateStr).toLocaleTimeString('pt-BR', {
+    return new Date(dateStr).toLocaleTimeString('pt-PT', {
       hour: '2-digit',
       minute: '2-digit',
     });
@@ -220,7 +220,7 @@ export function formatTime(dateStr) {
 export function formatDateTime(dateStr) {
   if (!dateStr) return '';
   try {
-    return new Date(dateStr).toLocaleString('pt-BR', {
+    return new Date(dateStr).toLocaleString('pt-PT', {
       day: '2-digit',
       month: '2-digit',
       hour: '2-digit',

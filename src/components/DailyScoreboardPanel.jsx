@@ -226,7 +226,7 @@ function BancaTab({ stats, maxGales, disabled }) {
 
       <div className="bg-zinc-950/80 border border-zinc-800 rounded-xl p-4 text-center">
         <p className="text-zinc-500 text-[10px] uppercase font-bold tracking-wider mb-1">
-          Banca actual
+          Banca atual
         </p>
         <p
           className={`font-black text-3xl tabular-nums ${
