@@ -226,22 +226,16 @@ export function getPlayBetAttempts(signal) {
   return Array.from({ length: attempts }, () => betZone);
 }
 
-/** Bolinhas ao lado do GREEN/RED — cores reais que saíram na mesa */
+/** Bolinhas ao lado do GREEN/RED — cor que o robô mandou entrar em cada tentativa */
 export function getGalePathDots(signal) {
-  const play = getPlayOutcomes(signal);
-  if (play.length) return play;
+  const betAttempts = getPlayBetAttempts(signal);
+  if (betAttempts.length) return betAttempts;
 
   const bet = getSignalBetColor(signal)?.zone;
-  const outcome = getSignalOutcomeColor(signal)?.zone;
+  if (!bet) return [];
+
   const attempts = Math.min(4, (Number(signal?.current_gale) || 0) + 1);
-
-  const dots = [];
-  for (let i = 0; i < attempts; i++) {
-    const isLast = i === attempts - 1;
-    dots.push(isLast ? outcome || bet : bet || outcome);
-  }
-
-  return dots.filter(Boolean);
+  return Array.from({ length: attempts }, () => bet);
 }
 
 export function getHistorySummary(signal) {

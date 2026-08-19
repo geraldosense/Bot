@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Check, X } from 'lucide-react';
 import { formatTime } from '../hooks/useWebSocket';
 import { getHistorySummary } from '../utils/signalResult';
+import { dedupeHistorySignals } from '../utils/historyDedupe';
 import BacBoColorSphere, { BacBoColorSphereRow } from './BacBoColorSphere';
 
 function HistoryRow({ signal }) {
@@ -101,7 +102,9 @@ export default function SignalHistory({
   showVerMais = true,
 }) {
   const [expanded, setExpanded] = useState(false);
-  const results = (history || []).filter((s) => s.signal_status === 'result');
+  const results = dedupeHistorySignals(
+    (history || []).filter((s) => s.signal_status === 'result'),
+  );
 
   const visible = expanded ? results : results.slice(0, limit);
   const hasMore = results.length > limit;

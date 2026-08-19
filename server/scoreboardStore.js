@@ -8,6 +8,7 @@ import {
   calcWinRate,
   calcTotalsFromPlays,
 } from './playResult.js';
+import { resolveSignalBet } from './signalBet.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, 'data');
@@ -107,18 +108,31 @@ export class ScoreboardStore {
     const day = todayKey(new Date(at));
     const bucket = this.dayBucket(day);
 
-    if (bucket.plays.some((p) => p.id === String(signal.id))) return false;
-
+    const existingIdx = bucket.plays.findIndex((p) => p.id === String(signal.id));
     const maxGales = Number.isFinite(Number(signal.gales)) ? Number(signal.gales) : MAX_GALES;
+    const bet = resolveSignalBet(signal) || signal.bet_recommendation || signal.bet || null;
 
-    bucket.plays.push({
+    const entry = {
       id: String(signal.id),
       result: classified,
-      bet: signal.bet_recommendation || signal.bet || null,
+      bet,
+      entry_bet: signal.entry_bet || signal.bet || bet,
+      bet_recommendation: signal.bet_recommendation || signal.bet || bet,
+      sequence: signal.sequence || null,
+      entry_condition: signal.entry_condition || null,
       gale: Number(signal.current_gale) || 0,
       maxGales,
       at,
-    });
+    };
+
+    if (existingIdx >= 0) {
+      bucket.plays[existingIdx] = { ...bucket.plays[existingIdx], ...entry };
+      bucket.plays.sort((a, b) => new Date(a.at) - new Date(b.at));
+      this.persist();
+      return false;
+    }
+
+    bucket.plays.push(entry);
 
     bucket.plays.sort((a, b) => new Date(a.at) - new Date(b.at));
     this.persist();
@@ -155,6 +169,29 @@ export class ScoreboardStore {
 
   getPlays(day = todayKey()) {
     return this.dayBucket(day).plays;
+  }
+
+  getSignalMeta(signalId) {
+    if (!signalId) return null;
+    const day = todayKey();
+    const bucket = this.store.games[this.gameId]?.days[day];
+    if (!bucket) return null;
+    const play = bucket.plays.find((p) => p.id === String(signalId));
+    if (!play) return null;
+
+    return {
+      id: play.id,
+      bet: play.bet,
+      entry_bet: play.entry_bet,
+      bet_recommendation: play.bet_recommendation,
+      sequence: play.sequence,
+      entry_condition: play.entry_condition,
+      current_gale: play.gale,
+      gales: play.maxGales,
+      result: play.result,
+      created_date: play.at,
+      signal_status: 'result',
+    };
   }
 
   getScoreboard() {

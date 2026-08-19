@@ -1,6 +1,7 @@
 import { normalizeOutcome, OUTCOMES } from './analyzer.js';
 import { dayStartIso } from './dayKey.js';
 import { calcWinRate } from './playResult.js';
+import { resolveSignalBet } from './signalBet.js';
 import { CASINO_SUPABASE_URL, casinoHeaders } from './casinoSupabase.js';
 
 const GAME_ID = process.env.BACBO_GAME_ID || 'bac_bo';
@@ -71,8 +72,8 @@ export async function fetchTodayResultSignals(gameId = GAME_ID) {
     const url =
       `${CASINO_SUPABASE_URL}/rest/v1/sinais?jogo=eq.${gameId}` +
       `&signal_status=eq.result&criado_em=gte.${encodeURIComponent(iso)}` +
-      `&order=criado_em.asc&limit=500` +
-      `&select=id,signal_status,result,result_value,bet_recommendation,bet_safe,current_gale,criado_em,sequence,entry_condition`;
+      `&order=criado_em.desc&limit=500` +
+      `&select=id,signal_status,result,result_value,bet_recommendation,bet_safe,bet,entry_bet,current_gale,gales,criado_em,sequence,entry_condition,raw_text`;
 
     const res = await fetch(url, { headers: casinoHeaders(), signal: AbortSignal.timeout(12000) });
     if (!res.ok) return [];
@@ -125,7 +126,7 @@ function resolveIaConfidence(row, signalStatus, bet) {
 export function mapCasinoSignal(row) {
   if (!row) return null;
 
-  const bet = mapBetRecommendation(row.bet_recommendation || row.bet_safe);
+  const bet = resolveSignalBet(row);
   const tieProtection =
     row.tie_protection === true ||
     row.tie_protection === 'true' ||
@@ -149,7 +150,8 @@ export function mapCasinoSignal(row) {
     created_date: row.criado_em,
     bet,
     entry_bet: bet,
-    bet_recommendation: row.bet_recommendation || row.bet_safe,
+    bet_recommendation: row.bet_recommendation || row.bet_safe || bet,
+    bet_safe: row.bet_safe,
     sequence: row.sequence,
     entry_condition: row.entry_condition,
     tie_protection: tieProtection,

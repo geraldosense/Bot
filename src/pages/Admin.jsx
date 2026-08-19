@@ -284,6 +284,26 @@ export default function Admin() {
     }
   };
 
+  const demoteAdmin = async (id, name) => {
+    if (
+      !confirm(
+        `Remover ${name || 'este administrador'} da função admin? Volta a membro VIP sem permissões de gestão.`,
+      )
+    ) {
+      return;
+    }
+    try {
+      const d = await fetchJson(`/api/admin/users/${id}/demote-admin`, {
+        method: 'POST',
+        headers: authHeaders(token),
+      });
+      setMsg(d.message || d.error);
+      load();
+    } catch (err) {
+      setMsg(err.message);
+    }
+  };
+
   const promoteAdmin = async (id) => {
     try {
       const d = await fetchJson(`/api/admin/promote-admin/${id}`, {
@@ -661,6 +681,13 @@ export default function Admin() {
                           className="accent-purple-500"
                         />
                       </label>
+                      <button
+                        type="button"
+                        onClick={() => demoteAdmin(u.id, u.name)}
+                        className="w-full mt-2 flex items-center justify-center gap-1.5 px-3 py-2 bg-red-600/90 hover:bg-red-600 rounded-lg text-white text-xs font-bold transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" /> Remover Admin
+                      </button>
                     </div>
                   </div>
                 ))}

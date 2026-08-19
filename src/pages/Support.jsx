@@ -8,10 +8,22 @@ import {
   HelpCircle,
   Gamepad2,
   Clock,
+  BookOpen,
+  Layers,
+  Wallet,
+  History,
+  Play,
 } from 'lucide-react';
 import BottomNav from '../components/BottomNav';
 import WhatsAppGroupCard from '../components/WhatsAppGroupCard';
-import { SITE_GAMES_GUIDE } from '../config/gamesGuide';
+import { SITE_GAMES_GUIDE, PLAYING_TUTORIALS } from '../config/gamesGuide';
+
+const TUTORIAL_ICONS = {
+  play: Play,
+  wallet: Wallet,
+  layers: Layers,
+  history: History,
+};
 
 const FAQ_GERAL = [
   {
@@ -138,8 +150,72 @@ function GameGuideItem({ game, index }) {
                   <span>{line}</span>
                 </li>
               ))}
+              {game.tips?.length > 0 && (
+                <>
+                  <li className="pt-2 text-[10px] font-black uppercase tracking-wider text-emerald-400/90">
+                    Melhores opções ao jogar
+                  </li>
+                  {game.tips.map((tip) => (
+                    <li key={tip} className="flex gap-2 text-zinc-400 text-xs leading-relaxed">
+                      <span className="text-emerald-500 shrink-0 mt-0.5">✓</span>
+                      <span>{tip}</span>
+                    </li>
+                  ))}
+                </>
+              )}
             </ul>
           </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+function TutorialItem({ tutorial, index }) {
+  const [open, setOpen] = useState(false);
+  const Icon = TUTORIAL_ICONS[tutorial.icon] || BookOpen;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.04 }}
+      className="rounded-xl border border-zinc-800/80 bg-zinc-900/50 overflow-hidden"
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-zinc-800/30 transition-colors"
+      >
+        <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+          <Icon className="w-4 h-4 text-emerald-400" />
+        </div>
+        <span className="flex-1 text-white text-sm font-semibold leading-snug">{tutorial.title}</span>
+        <ChevronRight
+          className={`w-4 h-4 text-zinc-500 shrink-0 transition-transform duration-200 ${
+            open ? 'rotate-90' : ''
+          }`}
+        />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.ol
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden px-4 pb-4 mx-3 pt-2 space-y-2 border-t border-zinc-800/60 list-none"
+          >
+            {tutorial.steps.map((step, i) => (
+              <li key={step} className="flex gap-2.5 text-zinc-400 text-xs leading-relaxed">
+                <span className="w-5 h-5 rounded-full bg-cyan-500/15 text-cyan-400 text-[10px] font-black flex items-center justify-center shrink-0">
+                  {i + 1}
+                </span>
+                <span>{step}</span>
+              </li>
+            ))}
+          </motion.ol>
         )}
       </AnimatePresence>
     </motion.div>
@@ -227,38 +303,39 @@ export default function Support() {
             <h2 className="text-white font-black text-sm tracking-wide">Central de Ajuda</h2>
           </div>
 
-          <div className="flex gap-2 px-3 pb-3">
-            <button
-              type="button"
-              onClick={() => setTab('geral')}
-              className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wide transition-all ${
-                tab === 'geral'
-                  ? 'bg-gradient-to-r from-cyan-500 to-emerald-500 text-black shadow-lg shadow-cyan-500/20'
-                  : 'bg-zinc-900 text-zinc-500 border border-zinc-800 hover:text-zinc-300'
-              }`}
-            >
-              Geral
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab('jogos')}
-              className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wide transition-all flex items-center justify-center gap-1.5 ${
-                tab === 'jogos'
-                  ? 'bg-gradient-to-r from-cyan-500 to-emerald-500 text-black shadow-lg shadow-cyan-500/20'
-                  : 'bg-zinc-900 text-zinc-500 border border-zinc-800 hover:text-zinc-300'
-              }`}
-            >
-              <Gamepad2 className="w-3.5 h-3.5" />
-              Jogos
-            </button>
+          <div className="flex gap-1.5 px-3 pb-3 overflow-x-auto">
+            {[
+              { id: 'geral', label: 'Geral' },
+              { id: 'jogos', label: 'Jogos', icon: Gamepad2 },
+              { id: 'tutoriais', label: 'Tutoriais', icon: BookOpen },
+            ].map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTab(t.id)}
+                className={`flex-1 min-w-[88px] py-2.5 rounded-xl text-xs font-black uppercase tracking-wide transition-all flex items-center justify-center gap-1.5 ${
+                  tab === t.id
+                    ? 'bg-gradient-to-r from-cyan-500 to-emerald-500 text-black shadow-lg shadow-cyan-500/20'
+                    : 'bg-zinc-900 text-zinc-500 border border-zinc-800 hover:text-zinc-300'
+                }`}
+              >
+                {t.icon && <t.icon className="w-3.5 h-3.5" />}
+                {t.label}
+              </button>
+            ))}
           </div>
 
           <div className="px-3 pb-3 space-y-2">
-            {tab === 'geral'
-              ? FAQ_GERAL.map((item, i) => <FaqItem key={item.q} item={item} index={i} />)
-              : SITE_GAMES_GUIDE.map((game, i) => (
-                  <GameGuideItem key={game.id} game={game} index={i} />
-                ))}
+            {tab === 'geral' &&
+              FAQ_GERAL.map((item, i) => <FaqItem key={item.q} item={item} index={i} />)}
+            {tab === 'jogos' &&
+              SITE_GAMES_GUIDE.map((game, i) => (
+                <GameGuideItem key={game.id} game={game} index={i} />
+              ))}
+            {tab === 'tutoriais' &&
+              PLAYING_TUTORIALS.map((tutorial, i) => (
+                <TutorialItem key={tutorial.id} tutorial={tutorial} index={i} />
+              ))}
           </div>
         </div>
 

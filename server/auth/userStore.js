@@ -444,6 +444,21 @@ export async function approveVipRevocation(userId, ownerId) {
   return sanitizeUser(updated);
 }
 
+export async function demoteAdmin(userId) {
+  const user = await findById(userId);
+  if (!user) throw new Error('Utilizador não encontrado');
+  if (user.role !== ROLES.ADMIN) throw new Error('Utilizador não é administrador');
+  if (user.role === ROLES.SUPER_ADMIN) {
+    throw new Error('Não é possível remover o Proprietário');
+  }
+
+  const updated = await updateUserRecord(userId, {
+    role: ROLES.VIP,
+    permissions: { ...DEFAULT_PERMISSIONS },
+  });
+  return sanitizeUser(updated);
+}
+
 export function hasPermission(user, permission) {
   if (!user) return false;
   if (user.role === ROLES.SUPER_ADMIN) return true;

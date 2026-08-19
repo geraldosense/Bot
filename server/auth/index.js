@@ -22,6 +22,7 @@ import {
   listVipRevocationRequests,
   approveVipRevocation,
   rejectVipRevocationRequest,
+  demoteAdmin,
   recordLogin,
   touchLastSeen,
   getAccountStats,
@@ -353,6 +354,15 @@ export function registerAdminRoutes(app, activeSessions) {
         req.user.id,
       );
       res.json({ user, message: 'Promovido a Admin' });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/admin/users/:id/demote-admin', authMiddleware, requireSuperAdmin, async (req, res) => {
+    try {
+      const user = await demoteAdmin(req.params.id);
+      res.json({ user, message: 'Administrador removido — voltou a membro VIP' });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

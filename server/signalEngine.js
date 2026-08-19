@@ -1,6 +1,7 @@
 import { shouldShowMonitoring } from './casinoDataProvider.js';
 import { scoreboardStore } from './scoreboardStore.js';
 import { classifyPlayResult, buildPlayResultAlert } from './playResult.js';
+import { mergeSignalRecords, resolveSignalBet, historyFingerprint } from './signalBet.js';
 
 /**
  * Motor de sinais — dados reais Evolution Bac Bo.
@@ -68,28 +69,78 @@ export class SignalEngine {
     this.emitScoreboard();
   }
 
+  normalizeHistorySignal(raw) {
+    if (!raw || raw.signal_status !== 'result' || !raw.id) return null;
+
+    const stored = scoreboardStore.getSignalMeta(raw.id);
+    const merged = mergeSignalRecords(stored || {}, raw);
+    const bet = resolveSignalBet(merged);
+
+    return this.enrichSignal({
+      ...merged,
+      bet: merged.bet || bet,
+      entry_bet: merged.entry_bet || bet,
+      bet_recommendation: merged.bet_recommendation || bet,
+      signal_status: 'result',
+    });
+  }
+
+  dedupeHistory() {
+    const byId = new Map();
+
+    for (const item of this.signalHistory) {
+      const id = String(item.id);
+      if (!byId.has(id)) {
+        byId.set(id, item);
+        continue;
+      }
+      byId.set(id, mergeSignalRecords(byId.get(id), item));
+    }
+
+    const seenFp = new Set();
+    const unique = [];
+
+    for (const item of [...byId.values()].sort(
+      (a, b) => new Date(b.created_date) - new Date(a.created_date),
+    )) {
+      const fp = historyFingerprint(item);
+      if (seenFp.has(fp)) continue;
+      seenFp.add(fp);
+      unique.push(item);
+    }
+
+    this.signalHistory = unique.slice(0, 50);
+  }
+
+  upsertHistorySignal(raw) {
+    const signal = this.normalizeHistorySignal(raw);
+    if (!signal) return false;
+
+    const id = String(signal.id);
+    const idx = this.signalHistory.findIndex((s) => String(s.id) === id);
+
+    if (idx >= 0) {
+      this.signalHistory[idx] = mergeSignalRecords(this.signalHistory[idx], signal);
+    } else {
+      this.signalHistory.unshift(signal);
+    }
+
+    this.dedupeHistory();
+    return true;
+  }
+
+  emitHistoryIfChanged(changed) {
+    if (changed) this.emit('history', this.signalHistory);
+  }
+
   mergeHistoryFromResults(results = []) {
-    const seen = new Set(this.signalHistory.map((s) => String(s.id)));
-    let added = false;
+    let changed = false;
 
     for (const raw of results) {
-      if (raw?.signal_status !== 'result' || !raw?.id) continue;
-      const id = String(raw.id);
-      if (seen.has(id)) continue;
-      seen.add(id);
-      this.signalHistory.push(this.enrichSignal(raw));
-      added = true;
+      if (this.upsertHistorySignal(raw)) changed = true;
     }
 
-    if (!added) return;
-
-    this.signalHistory.sort(
-      (a, b) => new Date(b.created_date) - new Date(a.created_date),
-    );
-    if (this.signalHistory.length > 50) {
-      this.signalHistory = this.signalHistory.slice(0, 50);
-    }
-    this.emit('history', this.signalHistory);
+    this.emitHistoryIfChanged(changed);
   }
 
   bootstrapHistory(todayResults = []) {
@@ -123,19 +174,20 @@ export class SignalEngine {
     const prev = this.currentSignal;
 
     if (signal.signal_status === 'confirmed' && !signal.entry_bet) {
-      signal.entry_bet = signal.bet;
+      signal.entry_bet = signal.bet || resolveSignalBet(signal);
     }
 
     if (signal.signal_status === 'gale_update' && prev) {
       signal = {
         ...prev,
         ...signal,
-        entry_bet: prev.entry_bet || prev.bet || signal.entry_bet || signal.bet,
-        bet: prev.bet || signal.bet || prev.entry_bet,
+        entry_bet: prev.entry_bet || prev.bet || signal.entry_bet || signal.bet || resolveSignalBet(prev),
+        bet: prev.bet || signal.bet || prev.entry_bet || resolveSignalBet(prev),
         bet_recommendation: prev.bet_recommendation || signal.bet_recommendation,
         tie_protection: signal.tie_protection ?? prev.tie_protection,
         gales: signal.gales ?? prev.gales ?? 0,
         analysis: signal.analysis || prev.analysis,
+        sequence: signal.sequence || prev.sequence,
       };
     }
 
@@ -146,9 +198,8 @@ export class SignalEngine {
       scoreboardStore.recordPlay(this.currentSignal);
 
       if (prevStatus !== 'result') {
-        this.signalHistory.unshift({ ...this.currentSignal });
-        if (this.signalHistory.length > 50) this.signalHistory.pop();
-        this.emit('history', this.signalHistory);
+        const changed = this.upsertHistorySignal(this.currentSignal);
+        this.emitHistoryIfChanged(changed);
 
         const outcome = classifyPlayResult(this.currentSignal);
         if (outcome) {
@@ -158,6 +209,8 @@ export class SignalEngine {
             alert: buildPlayResultAlert(this.currentSignal, outcome),
           });
         }
+      } else {
+        this.upsertHistorySignal(this.currentSignal);
       }
     }
 
@@ -169,9 +222,13 @@ export class SignalEngine {
     const sb = scoreboardStore.getScoreboard();
     const assertividade = sb.winRate;
     const meetsTarget = sb.meetsTarget === true;
+    const bet = resolveSignalBet(signal);
 
     return {
       ...signal,
+      bet: signal.bet || bet,
+      entry_bet: signal.entry_bet || bet,
+      bet_recommendation: signal.bet_recommendation || bet,
       ia_assertividade: assertividade,
       meets_assertivity_target: meetsTarget,
       confidence: meetsTarget ? assertividade : signal.confidence ?? null,
