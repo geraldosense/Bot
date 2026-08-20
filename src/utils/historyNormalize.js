@@ -42,9 +42,9 @@ function mergeHistoryRecords(prev, next) {
   return reconcileHistorySignal({
     ...prev,
     ...next,
-    entry_bet: next.entry_bet || prev.entry_bet,
-    bet: next.bet || prev.bet,
-    bet_recommendation: next.bet_recommendation || prev.bet_recommendation,
+    entry_bet: prev.entry_bet || next.entry_bet,
+    bet: prev.bet || next.bet,
+    bet_recommendation: prev.bet_recommendation || next.bet_recommendation,
     sequence: next.sequence || prev.sequence,
     entry_condition: next.entry_condition || prev.entry_condition,
     result_value: next.result_value || prev.result_value,

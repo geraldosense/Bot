@@ -1,5 +1,4 @@
 import {
-  getEntryZone,
   betToZone,
   getColorConfig,
   formatAttemptLabel,
@@ -204,18 +203,7 @@ export function getSignalBetColor(signal) {
     }
   }
 
-  const zone = getEntryZone(signal);
-  if (!zone) return null;
-  const config = getColorConfig(zone);
-  if (!config) return null;
-
-  return {
-    zone,
-    label: config.bet,
-    casinoLabel: config.casinoLabel,
-    emoji: config.emoji,
-    hex: config.hex,
-  };
+  return null;
 }
 
 export function getSignalOutcomeColor(signal) {

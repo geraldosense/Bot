@@ -6,6 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { SignalEngine } from './signalEngine.js';
 import { CasinoDataProvider } from './casinoDataProvider.js';
+import { senseSpotStore } from './senseSpotStore.js';
 import {
   initAuth,
   registerAuthRoutes,
@@ -143,6 +144,8 @@ app.get('*', (req, res) => {
 });
 
 httpServer.listen(PORT, '0.0.0.0', async () => {
+  await senseSpotStore.init();
+  await engine.bootstrapHistory();
   await casino.start();
   const base = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
   console.log(`🎰 Sense Bot — Evolution Casino LIVE`);

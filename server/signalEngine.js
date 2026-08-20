@@ -1,8 +1,9 @@
 import { shouldShowMonitoring } from './casinoDataProvider.js';
 import { scoreboardStore } from './scoreboardStore.js';
 import { classifyPlayResult, buildPlayResultAlert, resolveAlertOutcome, MAX_GALES } from './playResult.js';
-import { mergeSignalRecords, resolveSignalBet, reconcileSignalResult } from './signalBet.js';
-import { isRobotHistorySignal, backfillSequenceFromContext } from './historyUtils.js';
+import { mergeSignalRecords, resolveEntryBet, reconcileSignalResult } from './signalBet.js';
+import { isRobotHistorySignal, prepareRobotHistorySignal } from './historyUtils.js';
+import { senseSpotStore } from './senseSpotStore.js';
 
 const MAX_HISTORY = 500;
 
@@ -20,7 +21,18 @@ export class SignalEngine {
     this.casinoConnected = false;
     this.dataSource = 'evolution_casino';
     this.historyBootstrapped = false;
+    this.liveContext = [];
     this.rebuildDayHistory([]);
+  }
+
+  async bootstrapHistory() {
+    if (this.historyBootstrapped) return;
+    this.historyBootstrapped = true;
+    await senseSpotStore.init();
+    scoreboardStore.purgeImportedPlays();
+    await scoreboardStore.loadSenseSpotToday();
+    this.rebuildDayHistory();
+    this.emitHistory();
   }
 
   emit(type, data) {
@@ -61,12 +73,12 @@ export class SignalEngine {
     return 'idle';
   }
 
-  /** Importa jogadas do dia + totais externos */
+  /** Placar externo + histórico SenseSpot (não reimporta feed casino em massa) */
   syncScoreboardData({ casinoScoreboard, todayResults = [] }) {
     if (todayResults.length) {
-      scoreboardStore.importPlays(todayResults);
+      this.liveContext = todayResults.slice(-200);
     }
-    this.rebuildDayHistory(todayResults);
+    this.rebuildDayHistory();
     if (casinoScoreboard) {
       scoreboardStore.syncCasinoTotals(casinoScoreboard);
     }
@@ -100,23 +112,20 @@ export class SignalEngine {
     return isRobotHistorySignal(raw);
   }
 
-  /** Reconstrói histórico do dia — casino + disco + memória */
-  rebuildDayHistory(todayResults = []) {
-    const context = [...todayResults, ...this.signalHistory];
+  /** Reconstrói histórico do dia — SenseSpot (base própria) + sessão live */
+  rebuildDayHistory() {
+    const context = [...this.liveContext, ...this.signalHistory];
     const candidates = [
       ...scoreboardStore.getPlays().map((p) => this.playToHistorySignal(p)),
-      ...todayResults,
       ...this.signalHistory,
     ];
 
     const byId = new Map();
     for (const raw of candidates) {
       if (!this.isHistoryResult(raw)) continue;
-      const withSeq = backfillSequenceFromContext(
-        { ...raw, signal_status: 'result' },
-        context,
-      );
-      const normalized = this.normalizeHistorySignal(withSeq);
+      const prepared = prepareRobotHistorySignal(raw, context);
+      if (!prepared) continue;
+      const normalized = this.normalizeHistorySignal(prepared);
       if (!normalized) continue;
       const id = String(normalized.id);
       byId.set(id, byId.has(id) ? mergeSignalRecords(byId.get(id), normalized) : normalized);
@@ -147,13 +156,13 @@ export class SignalEngine {
 
     const stored = scoreboardStore.getSignalMeta(raw.id);
     const merged = mergeSignalRecords(stored || {}, raw);
-    const bet = resolveSignalBet(merged);
+    const bet = resolveEntryBet(merged);
 
     return this.enrichSignal({
       ...merged,
-      bet: merged.bet || bet,
-      entry_bet: merged.entry_bet || bet,
-      bet_recommendation: merged.bet_recommendation || bet,
+      bet: merged.entry_bet || merged.bet || bet,
+      entry_bet: merged.entry_bet || merged.bet || bet,
+      bet_recommendation: merged.bet_recommendation || merged.entry_bet || merged.bet || bet,
       signal_status: 'result',
     });
   }
@@ -217,21 +226,26 @@ export class SignalEngine {
     const prev = this.currentSignal;
 
     if (signal.signal_status === 'confirmed' && !signal.entry_bet) {
-      signal.entry_bet = signal.bet || resolveSignalBet(signal);
+      signal.entry_bet = signal.bet || resolveEntryBet(signal);
+    }
+
+    if (['confirmed', 'gale_update'].includes(signal.signal_status)) {
+      scoreboardStore.recordEntryIntent(signal);
     }
 
     if (signal.signal_status === 'gale_update' && prev) {
       signal = {
         ...prev,
         ...signal,
-        entry_bet: prev.entry_bet || prev.bet || signal.entry_bet || signal.bet || resolveSignalBet(prev),
-        bet: prev.bet || signal.bet || prev.entry_bet || resolveSignalBet(prev),
+        entry_bet: prev.entry_bet || prev.bet || signal.entry_bet || signal.bet || resolveEntryBet(prev),
+        bet: prev.bet || prev.entry_bet || signal.bet || resolveEntryBet(prev),
         bet_recommendation: prev.bet_recommendation || signal.bet_recommendation,
         tie_protection: signal.tie_protection ?? prev.tie_protection,
         gales: signal.gales ?? prev.gales ?? 0,
         analysis: signal.analysis || prev.analysis,
         sequence: signal.sequence || prev.sequence,
       };
+      scoreboardStore.recordEntryIntent(signal);
     }
 
     const prevStatus = prev?.signal_status;
@@ -269,15 +283,15 @@ export class SignalEngine {
     const assertividade = sb.winRate;
     const meetsTarget = sb.meetsTarget === true;
     const isAnalyzing = signal.signal_status === 'analyzing';
-    const bet = isAnalyzing ? null : resolveSignalBet(signal);
+    const bet = isAnalyzing ? null : resolveEntryBet(signal);
 
     const enriched = {
       ...signal,
-      bet: isAnalyzing ? null : signal.bet || bet,
-      entry_bet: isAnalyzing ? null : signal.entry_bet || bet,
+      bet: isAnalyzing ? null : signal.entry_bet || signal.bet || bet,
+      entry_bet: isAnalyzing ? null : signal.entry_bet || signal.bet || bet,
       bet_recommendation: isAnalyzing
         ? signal.bet_recommendation || null
-        : signal.bet_recommendation || bet,
+        : signal.bet_recommendation || signal.entry_bet || signal.bet || bet,
       ia_assertividade: assertividade,
       meets_assertivity_target: meetsTarget,
       confidence: meetsTarget ? assertividade : signal.confidence ?? null,

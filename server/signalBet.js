@@ -50,7 +50,8 @@ export function parseOutcomeZone(value) {
   return null;
 }
 
-export function resolveSignalBet(rowOrSignal) {
+/** Aposta do robô — só campos de recomendação IA (nunca sequence/raw_text) */
+export function resolveEntryBet(rowOrSignal) {
   if (!rowOrSignal) return null;
 
   const candidates = [
@@ -58,8 +59,8 @@ export function resolveSignalBet(rowOrSignal) {
     rowOrSignal.bet,
     rowOrSignal.bet_recommendation,
     rowOrSignal.bet_safe,
-    rowOrSignal.raw_text,
-    rowOrSignal.raw_message,
+    rowOrSignal.analysis?.bet,
+    rowOrSignal.analysis?.betRecommendation,
   ];
 
   for (const value of candidates) {
@@ -68,6 +69,10 @@ export function resolveSignalBet(rowOrSignal) {
   }
 
   return null;
+}
+
+export function resolveSignalBet(rowOrSignal) {
+  return resolveEntryBet(rowOrSignal);
 }
 
 function betToZone(bet) {
@@ -94,9 +99,7 @@ function parseResultFlag(row) {
 function resolveOutcomeZone(signal) {
   return (
     parseOutcomeZone(signal?.result_value) ||
-    parseOutcomeZone(signal?.actual_outcome) ||
-    parseOutcomeZone(signal?.sequence?.split(/\s+/).pop()) ||
-    parseOutcomeZone(signal?.entry_condition)
+    parseOutcomeZone(signal?.actual_outcome)
   );
 }
 
@@ -135,15 +138,18 @@ export function mergeSignalRecords(primary, secondary) {
   if (!secondary) return reconcileSignalResult(primary);
   if (!primary) return reconcileSignalResult(secondary);
 
-  const bet = resolveSignalBet(primary) || resolveSignalBet(secondary);
+  const bet = resolveEntryBet(primary) || resolveEntryBet(secondary);
 
   const merged = {
     ...primary,
     ...secondary,
-    bet: primary.bet || secondary.bet || bet,
+    bet: primary.bet || primary.entry_bet || secondary.bet || bet,
     entry_bet: primary.entry_bet || secondary.entry_bet || bet,
     bet_recommendation:
-      primary.bet_recommendation || secondary.bet_recommendation || primary.bet_safe || secondary.bet_safe,
+      primary.bet_recommendation ||
+      secondary.bet_recommendation ||
+      primary.bet_safe ||
+      secondary.bet_safe,
     bet_safe: primary.bet_safe || secondary.bet_safe,
     sequence: primary.sequence || secondary.sequence,
     entry_condition: primary.entry_condition || secondary.entry_condition,

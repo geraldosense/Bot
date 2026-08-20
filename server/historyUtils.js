@@ -1,5 +1,7 @@
 /** Regras de histórico de entradas do robô */
 
+import { resolveEntryBet } from './signalBet.js';
+
 export const PARTIAL_SCOREBOARD_MSG = 'Até agora estamos com';
 
 export function isPartialScoreboardSignal(signal) {
@@ -39,13 +41,48 @@ export function backfillSequenceFromContext(signal, contextSignals = []) {
   return { ...signal, sequence: prior.sequence };
 }
 
+/** Bloqueia aposta da entrada confirmada — evita confundir com cores da sequence */
+export function attachLockedEntryBet(signal, contextSignals = []) {
+  const locked = resolveEntryBet(signal);
+  if (locked) {
+    return {
+      ...signal,
+      entry_bet: locked,
+      bet: locked,
+      bet_recommendation: signal.bet_recommendation || signal.bet_safe || locked,
+    };
+  }
+
+  const createdMs = new Date(signal.created_date || signal.criado_em || 0).getTime();
+  if (!Number.isFinite(createdMs)) return signal;
+
+  const priorEntry = contextSignals.find((s) => {
+    if (!['confirmed', 'gale_update'].includes(s.signal_status)) return false;
+    const ms = new Date(s.created_date || s.criado_em || 0).getTime();
+    if (ms >= createdMs) return false;
+    return Boolean(s.bet_recommendation || s.bet_safe || s.entry_bet || s.bet);
+  });
+
+  if (!priorEntry) return signal;
+
+  const bet = resolveEntryBet(priorEntry);
+  if (!bet) return signal;
+
+  return {
+    ...signal,
+    entry_bet: bet,
+    bet,
+    bet_recommendation: priorEntry.bet_recommendation || priorEntry.bet_safe || bet,
+  };
+}
+
 export function prepareRobotHistorySignal(signal, contextSignals = []) {
   if (!isRobotHistorySignal(signal)) return null;
 
-  const normalized = {
-    ...signal,
-    signal_status: 'result',
-  };
+  const normalized = attachLockedEntryBet(
+    { ...signal, signal_status: 'result' },
+    contextSignals,
+  );
 
   return backfillSequenceFromContext(normalized, contextSignals);
 }

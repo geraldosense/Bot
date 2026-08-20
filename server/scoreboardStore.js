@@ -8,7 +8,8 @@ import {
   calcWinRate,
   calcTotalsFromPlays,
 } from './playResult.js';
-import { resolveSignalBet, reconcileSignalResult } from './signalBet.js';
+import { resolveEntryBet, reconcileSignalResult } from './signalBet.js';
+import { senseSpotStore } from './senseSpotStore.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, 'data');
@@ -68,10 +69,37 @@ export class ScoreboardStore {
     this.gameId = gameId;
     this.store = readStore();
     this.stableTotals = null;
+    this.pendingEntry = null;
     if (!this.store.games[gameId]) {
       this.store.games[gameId] = { days: {} };
     }
     this.loadStableFromDisk();
+  }
+
+  /** Bloqueia aposta quando o robô confirma entrada (cor exacta do painel) */
+  recordEntryIntent(signal) {
+    if (!signal?.id) return;
+    if (!['confirmed', 'gale_update'].includes(signal.signal_status)) return;
+
+    const bet = resolveEntryBet(signal);
+    if (!bet) return;
+
+    this.pendingEntry = {
+      signalId: String(signal.id),
+      entry_bet: bet,
+      bet_recommendation: signal.bet_recommendation || signal.bet_safe || bet,
+      sequence: signal.sequence || null,
+      entry_condition: signal.entry_condition || null,
+      gales: Number(signal.gales) || MAX_GALES,
+      tie_protection: signal.tie_protection ?? false,
+      lockedAt: signal.created_date || new Date().toISOString(),
+    };
+  }
+
+  consumePendingEntry() {
+    const entry = this.pendingEntry;
+    this.pendingEntry = null;
+    return entry;
   }
 
   loadStableFromDisk() {
@@ -116,31 +144,53 @@ export class ScoreboardStore {
 
     const existingIdx = bucket.plays.findIndex((p) => p.id === String(reconciled.id));
     const maxGales = Number.isFinite(Number(reconciled.gales)) ? Number(reconciled.gales) : MAX_GALES;
-    const bet = resolveSignalBet(reconciled) || reconciled.bet_recommendation || reconciled.bet || null;
+
+    const pending =
+      this.pendingEntry?.signalId === String(reconciled.id) ? this.pendingEntry : null;
+    const existing = existingIdx >= 0 ? bucket.plays[existingIdx] : null;
+    const bet =
+      existing?.entry_bet ||
+      pending?.entry_bet ||
+      resolveEntryBet(reconciled);
+
+    if (!bet) return false;
 
     const entry = {
       id: String(reconciled.id),
       result: classified,
       bet,
-      entry_bet: reconciled.entry_bet || reconciled.bet || bet,
-      bet_recommendation: reconciled.bet_recommendation || reconciled.bet || bet,
-      sequence: reconciled.sequence || null,
-      entry_condition: reconciled.entry_condition || null,
+      entry_bet: bet,
+      bet_recommendation:
+        pending?.bet_recommendation ||
+        reconciled.bet_recommendation ||
+        reconciled.bet_safe ||
+        bet,
+      sequence: reconciled.sequence || pending?.sequence || null,
+      entry_condition: reconciled.entry_condition || pending?.entry_condition || null,
       result_value: reconciled.result_value || reconciled.actual_outcome || null,
       raw_message: reconciled.raw_message || reconciled.raw_text || null,
       scoreboard_green: Number(reconciled.scoreboard_green) || 0,
       scoreboard_red: Number(reconciled.scoreboard_red) || 0,
       win_rate: reconciled.win_rate ?? null,
-      tie_protection: reconciled.tie_protection ?? false,
+      tie_protection: reconciled.tie_protection ?? pending?.tie_protection ?? false,
       gale: Number(reconciled.current_gale) || 0,
       maxGales,
       at,
+      source: 'sense_spot',
     };
 
     if (existingIdx >= 0) {
-      bucket.plays[existingIdx] = { ...bucket.plays[existingIdx], ...entry };
+      const prev = bucket.plays[existingIdx];
+      bucket.plays[existingIdx] = {
+        ...entry,
+        entry_bet: prev.entry_bet || entry.entry_bet,
+        bet: prev.bet || entry.bet,
+        bet_recommendation: prev.bet_recommendation || entry.bet_recommendation,
+      };
       bucket.plays.sort((a, b) => new Date(a.at) - new Date(b.at));
       this.persist();
+      senseSpotStore.savePlay(bucket.plays[existingIdx]).catch(() => {});
+      this.consumePendingEntry();
       return false;
     }
 
@@ -148,9 +198,67 @@ export class ScoreboardStore {
 
     bucket.plays.sort((a, b) => new Date(a.at) - new Date(b.at));
     this.persist();
+    senseSpotStore.savePlay(entry).catch(() => {});
+    this.consumePendingEntry();
     return true;
   }
 
+  async loadSenseSpotToday() {
+    const plays = await senseSpotStore.listToday();
+    const day = todayKey();
+    const bucket = this.dayBucket(day);
+
+    for (const signal of plays) {
+      const idx = bucket.plays.findIndex((p) => p.id === String(signal.id));
+      const entry = {
+        id: String(signal.id),
+        result: signal.result,
+        bet: signal.entry_bet || signal.bet,
+        entry_bet: signal.entry_bet || signal.bet,
+        bet_recommendation: signal.bet_recommendation || signal.entry_bet,
+        sequence: signal.sequence,
+        entry_condition: signal.entry_condition,
+        result_value: signal.result_value,
+        scoreboard_green: signal.scoreboard_green || 0,
+        scoreboard_red: signal.scoreboard_red || 0,
+        win_rate: signal.win_rate,
+        tie_protection: signal.tie_protection,
+        gale: signal.current_gale || 0,
+        maxGales: signal.gales || MAX_GALES,
+        at: signal.created_date,
+        source: 'sense_spot',
+      };
+      if (idx >= 0) {
+        const prev = bucket.plays[idx];
+        bucket.plays[idx] = {
+          ...entry,
+          entry_bet: prev.entry_bet || entry.entry_bet,
+          bet: prev.bet || entry.bet,
+        };
+      } else {
+        bucket.plays.push(entry);
+      }
+    }
+
+    bucket.plays.sort((a, b) => new Date(a.at) - new Date(b.at));
+    this.persist();
+    return bucket.plays;
+  }
+
+  /** Remove entradas importadas do feed externo (histórico errado) */
+  purgeImportedPlays(day = todayKey()) {
+    const bucket = this.dayBucket(day);
+    const before = bucket.plays.length;
+    bucket.plays = bucket.plays.filter((p) => p.source === 'sense_spot');
+    if (bucket.plays.length !== before) {
+      this.persist();
+      console.log(
+        `[sense-spot] Removidas ${before - bucket.plays.length} entradas importadas do feed externo`,
+      );
+    }
+  }
+
+  /** @deprecated — histórico vem do SenseSpot, não reimportar feed externo em massa */
   importPlays(signals = []) {
     let added = 0;
     for (const signal of signals) {
