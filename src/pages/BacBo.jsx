@@ -50,7 +50,7 @@ export default function BacBo() {
           scoreboard={snapshot.scoreboard}
           variant="robot"
           title="Histórico de Entradas"
-          limit={200}
+          limit={500}
           defaultExpanded
           showVerMais={false}
           maxHeight={520}

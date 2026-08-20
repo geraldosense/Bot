@@ -4,7 +4,7 @@ import { classifyPlayResult, buildPlayResultAlert, resolveAlertOutcome, MAX_GALE
 import { mergeSignalRecords, resolveSignalBet, reconcileSignalResult } from './signalBet.js';
 import { isRobotHistorySignal, backfillSequenceFromContext } from './historyUtils.js';
 
-const MAX_HISTORY = 200;
+const MAX_HISTORY = 500;
 
 /**
  * Motor de sinais — dados reais Evolution Bac Bo.
@@ -71,6 +71,7 @@ export class SignalEngine {
       scoreboardStore.syncCasinoTotals(casinoScoreboard);
     }
     this.emitScoreboard();
+    this.emitHistory();
   }
 
   playToHistorySignal(play) {
@@ -126,12 +127,18 @@ export class SignalEngine {
     );
 
     const prevKey = this.signalHistory.map((s) => String(s.id)).join('|');
+    const prevCount = this.signalHistory.length;
     this.signalHistory = sorted.slice(0, MAX_HISTORY);
     const nextKey = this.signalHistory.map((s) => String(s.id)).join('|');
 
-    if (prevKey !== nextKey) {
+    if (prevKey !== nextKey || this.signalHistory.length !== prevCount) {
       this.emit('history', this.signalHistory);
     }
+  }
+
+  /** Força reenvio do histórico completo aos clientes */
+  emitHistory() {
+    this.emit('history', this.signalHistory);
   }
 
   normalizeHistorySignal(raw) {
@@ -185,10 +192,6 @@ export class SignalEngine {
 
     this.dedupeHistory();
     return true;
-  }
-
-  emitHistory() {
-    this.emit('history', this.signalHistory);
   }
 
   setCasinoScoreboard(casinoScoreboard) {

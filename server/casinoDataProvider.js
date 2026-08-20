@@ -11,6 +11,43 @@ import {
 
 const GAME_ID = process.env.BACBO_GAME_ID || 'bac_bo';
 
+const SINAL_RESULT_SELECT =
+  'id,signal_status,result,result_value,bet_recommendation,bet_safe,current_gale,gales,tie_protection,criado_em,sequence,entry_condition,raw_text,scoreboard_green,scoreboard_red,win_rate';
+
+const SINAL_CONTEXT_SELECT =
+  'id,signal_status,sequence,criado_em,bet_recommendation,bet_safe,raw_text,entry_condition';
+
+const HISTORY_PAGE_SIZE = 200;
+
+/** Paginação Supabase — busca todas as páginas */
+async function fetchAllSupabaseRows(baseUrl, { pageSize = HISTORY_PAGE_SIZE, timeoutMs = 20000 } = {}) {
+  const rows = [];
+  let offset = 0;
+
+  while (true) {
+    const sep = baseUrl.includes('?') ? '&' : '?';
+    const url = `${baseUrl}${sep}limit=${pageSize}&offset=${offset}`;
+    const res = await fetch(url, {
+      headers: casinoHeaders(),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`Supabase ${res.status}: ${body.slice(0, 200)}`);
+    }
+
+    const batch = await res.json();
+    if (!Array.isArray(batch) || !batch.length) break;
+
+    rows.push(...batch);
+    if (batch.length < pageSize) break;
+    offset += pageSize;
+  }
+
+  return rows;
+}
+
 export async function fetchCasinoRounds(gameId = GAME_ID, limit = 200) {
   try {
     const url = `${CASINO_SUPABASE_URL}/rest/v1/bac_bo_rounds?select=id,outcome,multiplier,round_timestamp,game_id&game_id=eq.${gameId}&order=round_timestamp.desc&limit=${limit}`;
@@ -75,26 +112,29 @@ export async function fetchTodayResultSignals(gameId = GAME_ID) {
   return bundle.results;
 }
 
-/** Todos os sinais do dia (results + confirmed) para backfill de sequence */
+/** Todos os resultados do dia — paginado, colunas válidas do Supabase */
 export async function fetchTodayHistoryBundle(gameId = GAME_ID) {
   try {
     const iso = dayStartIso();
+    const base = `${CASINO_SUPABASE_URL}/rest/v1/sinais?jogo=eq.${gameId}&criado_em=gte.${encodeURIComponent(iso)}`;
 
-    const url =
-      `${CASINO_SUPABASE_URL}/rest/v1/sinais?jogo=eq.${gameId}` +
-      `&criado_em=gte.${encodeURIComponent(iso)}` +
-      `&order=criado_em.desc&limit=800` +
-      `&select=id,signal_status,result,result_value,bet_recommendation,bet_safe,bet,entry_bet,current_gale,gales,tie_protection,criado_em,sequence,entry_condition,raw_text,scoreboard_green,scoreboard_red,win_rate`;
+    const [resultRows, contextRows] = await Promise.all([
+      fetchAllSupabaseRows(
+        `${base}&signal_status=eq.result&order=criado_em.desc&select=${SINAL_RESULT_SELECT}`,
+      ),
+      fetchAllSupabaseRows(
+        `${base}&signal_status=in.(result,confirmed)&order=criado_em.desc&select=${SINAL_CONTEXT_SELECT}`,
+        { pageSize: 300 },
+      ),
+    ]);
 
-    const res = await fetch(url, { headers: casinoHeaders(), signal: AbortSignal.timeout(12000) });
-    if (!res.ok) return { results: [], context: [] };
-
-    const data = await res.json();
-    const context = (data || []).map(mapCasinoSignal).filter(Boolean);
-    const rawResults = context.filter(
-      (s) => s.signal_status === 'result' || s.signal_status === 'green' || isRobotHistorySignal(s),
-    );
+    const context = contextRows.map(mapCasinoSignal).filter(Boolean);
+    const rawResults = resultRows.map(mapCasinoSignal).filter(Boolean);
     const results = filterRobotHistorySignals(rawResults, context);
+
+    if (results.length > 0) {
+      console.log(`[casino] Histórico do dia: ${results.length} entradas do robô`);
+    }
 
     return { results, context };
   } catch (err) {

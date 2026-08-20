@@ -5,7 +5,7 @@ import { formatTime } from '../hooks/useWebSocket';
 import { getMoneytixHistorySummary } from '../utils/signalResult';
 import {
   normalizeHistoryList,
-  resolveHistoryScoreboard,
+  computeHistoryStats,
   filterHistoryList,
 } from '../utils/historyNormalize';
 import { formatWinRate, formatWinRatePrecise } from '../utils/scoreboard';
@@ -135,29 +135,37 @@ function HistoryRowMoneyTix({ signal, index, total, isLatest, live, expanded, on
   );
 }
 
-function StatsBar({ stats, live, entryCount }) {
+function StatsBar({ stats, live, placarIa }) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className="inline-flex items-center gap-1 rounded-lg bg-zinc-800/70 border border-zinc-700/50 px-2 py-1 text-[10px] font-bold text-zinc-300">
-        <History className="w-3 h-3 text-zinc-500" />
-        {entryCount} entradas robô
-      </span>
-      <span className="inline-flex items-center rounded-lg bg-emerald-500/15 border border-emerald-500/30 px-2 py-1 text-[10px] font-bold text-emerald-400">
-        {stats.greens} GREEN
-      </span>
-      <span className="inline-flex items-center rounded-lg bg-red-500/15 border border-red-500/30 px-2 py-1 text-[10px] font-bold text-red-400">
-        {stats.losses ?? stats.reds} LOSS
-      </span>
-      {stats.total > 0 && (
-        <span className="inline-flex items-center rounded-lg bg-cyan-500/10 border border-cyan-500/25 px-2 py-1 text-[10px] font-bold text-cyan-400">
-          {formatWinRate(stats.winRate)}
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="inline-flex items-center gap-1 rounded-lg bg-zinc-800/70 border border-zinc-700/50 px-2 py-1 text-[10px] font-bold text-zinc-300">
+          <History className="w-3 h-3 text-zinc-500" />
+          {stats.total} entradas robô
         </span>
-      )}
-      {live && (
-        <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 px-2 py-1 text-[9px] font-bold text-emerald-400">
-          <Wifi className="w-3 h-3" />
-          Ao vivo
+        <span className="inline-flex items-center rounded-lg bg-emerald-500/15 border border-emerald-500/30 px-2 py-1 text-[10px] font-bold text-emerald-400">
+          {stats.greens} GREEN
         </span>
+        <span className="inline-flex items-center rounded-lg bg-red-500/15 border border-red-500/30 px-2 py-1 text-[10px] font-bold text-red-400">
+          {stats.losses ?? stats.reds} LOSS
+        </span>
+        {stats.total > 0 && (
+          <span className="inline-flex items-center rounded-lg bg-cyan-500/10 border border-cyan-500/25 px-2 py-1 text-[10px] font-bold text-cyan-400">
+            {formatWinRate(stats.winRate)}
+          </span>
+        )}
+        {live && (
+          <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 px-2 py-1 text-[9px] font-bold text-emerald-400">
+            <Wifi className="w-3 h-3" />
+            Ao vivo
+          </span>
+        )}
+      </div>
+      {placarIa && (
+        <p className="text-[9px] text-zinc-500 px-0.5">
+          Placar IA do dia · {placarIa.greens} GREEN · {placarIa.reds} LOSS ·{' '}
+          {formatWinRatePrecise(placarIa.winRate)}
+        </p>
       )}
     </div>
   );
@@ -182,17 +190,23 @@ export default function SignalHistory({
   const prevTopIdRef = useRef(null);
 
   const allResults = useMemo(() => normalizeHistoryList(history), [history]);
-  const boardStats = useMemo(
-    () => resolveHistoryScoreboard(history, scoreboard),
-    [history, scoreboard],
-  );
+  const listStats = useMemo(() => computeHistoryStats(history), [history]);
+
+  const placarIa = useMemo(() => {
+    const g = Number(scoreboard?.greens) || 0;
+    const r = Number(scoreboard?.reds) || 0;
+    if (g + r > 0 && scoreboard?.source === 'casino_ia') {
+      return { greens: g, reds: r, winRate: scoreboard.winRate };
+    }
+    return null;
+  }, [scoreboard]);
 
   const filtered = useMemo(
     () => filterHistoryList(allResults, { result: resultFilter }),
     [allResults, resultFilter],
   );
 
-  const pageLimit = variant === 'robot' ? Math.max(limit, 100) : limit;
+  const pageLimit = variant === 'robot' ? Math.max(limit, 500) : limit;
   const visible = listExpanded ? filtered : filtered.slice(0, pageLimit);
   const hasMore = filtered.length > pageLimit;
   const isRobot = variant === 'robot';
@@ -269,7 +283,7 @@ export default function SignalHistory({
           )}
         </div>
 
-        <StatsBar stats={boardStats} live={live} entryCount={allResults.length} />
+        <StatsBar stats={listStats} live={live} placarIa={placarIa} />
 
         <div className="flex gap-1.5 p-0.5 rounded-lg bg-zinc-900/80 border border-zinc-800/80">
           {RESULT_FILTERS.map((f) => (
@@ -288,11 +302,11 @@ export default function SignalHistory({
               }`}
             >
               {f.label}
-              {f.id === 'green' && boardStats.greens > 0 && (
-                <span className="ml-1 opacity-80">({boardStats.greens})</span>
+              {f.id === 'green' && listStats.greens > 0 && (
+                <span className="ml-1 opacity-80">({listStats.greens})</span>
               )}
-              {f.id === 'loss' && (boardStats.losses ?? boardStats.reds) > 0 && (
-                <span className="ml-1 opacity-80">({boardStats.losses ?? boardStats.reds})</span>
+              {f.id === 'loss' && (listStats.losses ?? listStats.reds) > 0 && (
+                <span className="ml-1 opacity-80">({listStats.losses ?? listStats.reds})</span>
               )}
             </button>
           ))}
