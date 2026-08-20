@@ -1,7 +1,9 @@
 import { shouldShowMonitoring } from './casinoDataProvider.js';
 import { scoreboardStore } from './scoreboardStore.js';
-import { classifyPlayResult, buildPlayResultAlert } from './playResult.js';
-import { mergeSignalRecords, resolveSignalBet, historyFingerprint } from './signalBet.js';
+import { classifyPlayResult, buildPlayResultAlert, MAX_GALES } from './playResult.js';
+import { mergeSignalRecords, resolveSignalBet, historyFingerprint, reconcileSignalResult } from './signalBet.js';
+
+const MAX_HISTORY = 100;
 
 /**
  * Motor de sinais — dados reais Evolution Bac Bo.
@@ -17,6 +19,7 @@ export class SignalEngine {
     this.casinoConnected = false;
     this.dataSource = 'evolution_casino';
     this.historyBootstrapped = false;
+    this.rebuildDayHistory([]);
   }
 
   emit(type, data) {
@@ -37,7 +40,7 @@ export class SignalEngine {
 
     this.emit('state', {
       state: this.state,
-      signal: this.currentSignal,
+      signal: monitoring ? null : this.currentSignal,
       scoreboard: this.getScoreboard(),
       roundsCount: this.rounds.length,
       casinoConnected: this.casinoConnected,
@@ -61,16 +64,83 @@ export class SignalEngine {
   syncScoreboardData({ casinoScoreboard, todayResults = [] }) {
     if (todayResults.length) {
       scoreboardStore.importPlays(todayResults);
-      this.mergeHistoryFromResults(todayResults);
     }
+    this.rebuildDayHistory(todayResults);
     if (casinoScoreboard) {
       scoreboardStore.syncCasinoTotals(casinoScoreboard);
     }
     this.emitScoreboard();
   }
 
+  playToHistorySignal(play) {
+    if (!play?.id) return null;
+    return {
+      id: play.id,
+      signal_status: 'result',
+      result: play.result,
+      created_date: play.at,
+      bet: play.bet,
+      entry_bet: play.entry_bet || play.bet,
+      bet_recommendation: play.bet_recommendation || play.bet,
+      sequence: play.sequence,
+      entry_condition: play.entry_condition,
+      current_gale: play.gale ?? 0,
+      gales: play.maxGales ?? MAX_GALES,
+    };
+  }
+
+  isHistoryResult(raw) {
+    if (!raw?.id) return false;
+    if (raw.signal_status === 'result') return true;
+    const r = String(raw.result || '').toLowerCase();
+    return r === 'green' || r === 'loss' || r === 'red';
+  }
+
+  /** Reconstrói histórico do dia — casino + disco + memória */
+  rebuildDayHistory(todayResults = []) {
+    const candidates = [
+      ...scoreboardStore.getPlays().map((p) => this.playToHistorySignal(p)),
+      ...todayResults,
+      ...this.signalHistory,
+    ];
+
+    const byId = new Map();
+    for (const raw of candidates) {
+      if (!this.isHistoryResult(raw)) continue;
+      const normalized = this.normalizeHistorySignal({
+        ...raw,
+        signal_status: 'result',
+      });
+      if (!normalized) continue;
+      const id = String(normalized.id);
+      byId.set(id, byId.has(id) ? mergeSignalRecords(byId.get(id), normalized) : normalized);
+    }
+
+    const sorted = [...byId.values()].sort(
+      (a, b) => new Date(b.created_date) - new Date(a.created_date),
+    );
+
+    const seenFp = new Set();
+    const unique = [];
+    for (const item of sorted) {
+      const fp = historyFingerprint(item);
+      if (seenFp.has(fp)) continue;
+      seenFp.add(fp);
+      unique.push(item);
+    }
+
+    const prevKey = this.signalHistory.map((s) => String(s.id)).join('|');
+    this.signalHistory = unique.slice(0, MAX_HISTORY);
+    const nextKey = this.signalHistory.map((s) => String(s.id)).join('|');
+
+    if (prevKey !== nextKey) {
+      this.emit('history', this.signalHistory);
+    }
+  }
+
   normalizeHistorySignal(raw) {
-    if (!raw || raw.signal_status !== 'result' || !raw.id) return null;
+    if (!raw?.id) return null;
+    if (!this.isHistoryResult(raw)) return null;
 
     const stored = scoreboardStore.getSignalMeta(raw.id);
     const merged = mergeSignalRecords(stored || {}, raw);
@@ -109,11 +179,13 @@ export class SignalEngine {
       unique.push(item);
     }
 
-    this.signalHistory = unique.slice(0, 50);
+    this.signalHistory = unique.slice(0, MAX_HISTORY);
   }
 
   upsertHistorySignal(raw) {
-    const signal = this.normalizeHistorySignal(raw);
+    if (!this.isHistoryResult(raw)) return false;
+
+    const signal = this.normalizeHistorySignal({ ...raw, signal_status: 'result' });
     if (!signal) return false;
 
     const id = String(signal.id);
@@ -129,26 +201,8 @@ export class SignalEngine {
     return true;
   }
 
-  emitHistoryIfChanged(changed) {
-    if (changed) this.emit('history', this.signalHistory);
-  }
-
-  mergeHistoryFromResults(results = []) {
-    let changed = false;
-
-    for (const raw of results) {
-      if (this.upsertHistorySignal(raw)) changed = true;
-    }
-
-    this.emitHistoryIfChanged(changed);
-  }
-
-  bootstrapHistory(todayResults = []) {
-    if (this.historyBootstrapped) return;
-    scoreboardStore.importPlays(todayResults);
-    this.mergeHistoryFromResults(todayResults);
-    this.historyBootstrapped = true;
-    this.emitScoreboard();
+  emitHistory() {
+    this.emit('history', this.signalHistory);
   }
 
   setCasinoScoreboard(casinoScoreboard) {
@@ -197,20 +251,23 @@ export class SignalEngine {
     if (signal.signal_status === 'result') {
       scoreboardStore.recordPlay(this.currentSignal);
 
-      if (prevStatus !== 'result') {
-        const changed = this.upsertHistorySignal(this.currentSignal);
-        this.emitHistoryIfChanged(changed);
+      const prevKey = this.signalHistory.map((s) => String(s.id)).join('|');
+      this.upsertHistorySignal(this.currentSignal);
+      const nextKey = this.signalHistory.map((s) => String(s.id)).join('|');
 
-        const outcome = classifyPlayResult(this.currentSignal);
-        if (outcome) {
-          this.emit('play_result', {
-            outcome,
-            signal: this.currentSignal,
-            alert: buildPlayResultAlert(this.currentSignal, outcome),
-          });
+      if (prevStatus !== 'result' || prevKey !== nextKey) {
+        this.emitHistory();
+
+        if (prevStatus !== 'result') {
+          const outcome = classifyPlayResult(this.currentSignal);
+          if (outcome) {
+            this.emit('play_result', {
+              outcome,
+              signal: this.currentSignal,
+              alert: buildPlayResultAlert(this.currentSignal, outcome),
+            });
+          }
         }
-      } else {
-        this.upsertHistorySignal(this.currentSignal);
       }
     }
 
@@ -222,17 +279,22 @@ export class SignalEngine {
     const sb = scoreboardStore.getScoreboard();
     const assertividade = sb.winRate;
     const meetsTarget = sb.meetsTarget === true;
-    const bet = resolveSignalBet(signal);
+    const isAnalyzing = signal.signal_status === 'analyzing';
+    const bet = isAnalyzing ? null : resolveSignalBet(signal);
 
-    return {
+    const enriched = {
       ...signal,
-      bet: signal.bet || bet,
-      entry_bet: signal.entry_bet || bet,
-      bet_recommendation: signal.bet_recommendation || bet,
+      bet: isAnalyzing ? null : signal.bet || bet,
+      entry_bet: isAnalyzing ? null : signal.entry_bet || bet,
+      bet_recommendation: isAnalyzing
+        ? signal.bet_recommendation || null
+        : signal.bet_recommendation || bet,
       ia_assertividade: assertividade,
       meets_assertivity_target: meetsTarget,
       confidence: meetsTarget ? assertividade : signal.confidence ?? null,
     };
+
+    return signal.signal_status === 'result' ? reconcileSignalResult(enriched) : enriched;
   }
 
   setCasinoStatus(status) {

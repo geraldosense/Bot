@@ -1,7 +1,7 @@
 import { normalizeOutcome, OUTCOMES } from './analyzer.js';
 import { dayStartIso } from './dayKey.js';
 import { calcWinRate } from './playResult.js';
-import { resolveSignalBet } from './signalBet.js';
+import { resolveSignalBet, reconcileSignalResult } from './signalBet.js';
 import { CASINO_SUPABASE_URL, casinoHeaders } from './casinoSupabase.js';
 
 const GAME_ID = process.env.BACBO_GAME_ID || 'bac_bo';
@@ -132,34 +132,29 @@ export function mapCasinoSignal(row) {
     row.tie_protection === 'true' ||
     String(row.tie_protection).toLowerCase() === 'true';
 
-  let result = null;
-  if (row.result === 'green' || row.result === 'GREEN') result = 'green';
-  if (row.result === 'loss' || row.result === 'LOSS' || row.result === 'red') result = 'loss';
-  if (row.signal_status === 'result' && row.result_value) {
-    result = String(row.result_value).toLowerCase().includes('green') ? 'green' : 'loss';
-  }
-
   const signalStatus =
-    row.signal_status === 'result' && result
-      ? 'result'
-      : row.signal_status || 'analyzing';
+    row.signal_status === 'result' ? 'result' : row.signal_status || 'analyzing';
 
-  return {
+  const isAnalyzing = signalStatus === 'analyzing';
+
+  const mapped = reconcileSignalResult({
     id: row.id,
     signal_status: signalStatus,
     created_date: row.criado_em,
-    bet,
-    entry_bet: bet,
-    bet_recommendation: row.bet_recommendation || row.bet_safe || bet,
+    bet: isAnalyzing ? null : bet,
+    entry_bet: isAnalyzing ? null : bet,
+    bet_recommendation: isAnalyzing
+      ? row.bet_recommendation || row.bet_safe || null
+      : row.bet_recommendation || row.bet_safe || bet,
     bet_safe: row.bet_safe,
     sequence: row.sequence,
     entry_condition: row.entry_condition,
     tie_protection: tieProtection,
-    gales: Number(row.gales) || 0,
+    gales: Number(row.gales) || 3,
     current_gale: Number(row.current_gale) || 0,
-    result,
+    result: parseResultFlag(row),
     result_value: row.result_value,
-    actual_outcome: row.result_value || row.sequence || null,
+    actual_outcome: row.result_value || null,
     scoreboard_green: Number(row.scoreboard_green) || 0,
     scoreboard_red: Number(row.scoreboard_red) || 0,
     win_rate: row.win_rate,
@@ -167,15 +162,31 @@ export function mapCasinoSignal(row) {
     source: 'evolution_casino',
     confidence: resolveIaConfidence(row, signalStatus, bet),
     ia_assertividade: resolveIaConfidence(row, signalStatus, bet),
-    analysis: bet
-      ? {
-          bet,
-          betRecommendation: row.bet_recommendation || row.bet_safe,
-          reason: row.entry_condition || 'Sinal confirmado pela mesa Evolution Bac Bo',
-          entryCondition: row.sequence?.split(' ').pop() || OUTCOMES[bet]?.emoji,
-        }
-      : null,
-  };
+    analysis:
+      !isAnalyzing && bet
+        ? {
+            bet,
+            betRecommendation: row.bet_recommendation || row.bet_safe,
+            reason: row.entry_condition || 'Sinal confirmado pela mesa Evolution Bac Bo',
+            entryCondition: row.sequence?.split(' ').pop() || OUTCOMES[bet]?.emoji,
+          }
+        : null,
+  });
+
+  return mapped;
+}
+
+function parseResultFlag(row) {
+  const raw = String(row?.result || '').toLowerCase();
+  if (raw === 'green') return 'green';
+  if (raw === 'loss' || raw === 'red') return 'loss';
+
+  const rv = String(row?.result_value || '').toLowerCase();
+  if (!rv) return null;
+  if (rv.includes('green') || rv.includes('acert') || rv.includes('win')) return 'green';
+  if (rv.includes('loss') || rv.includes('red') || rv.includes('perd')) return 'loss';
+
+  return null;
 }
 
 /** Lógica igual ao moneytix — quando mostrar monitoramento vs sinal */
@@ -184,7 +195,8 @@ export function shouldShowMonitoring(signal) {
 
   const ageMs = Date.now() - new Date(signal.created_date).getTime();
 
-  if (signal.signal_status === 'analyzing') return ageMs > 10000;
+  // Analisando mesa — sempre ecrã satélite, sem cor de entrada anterior
+  if (signal.signal_status === 'analyzing') return true;
   if (signal.signal_status === 'confirmed') return ageMs > 180000;
   if (signal.signal_status === 'result') return ageMs > 20000;
   if (signal.signal_status === 'gale_update') return ageMs > 180000;

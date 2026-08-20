@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useSignalAlerts } from '../hooks/useSignalAlerts';
 import BacBoAIPanel from '../components/BacBoAIPanel';
+import SignalHistory from '../components/SignalHistory';
 import SignalResultAlert from '../components/SignalResultAlert';
 import BottomNav from '../components/BottomNav';
 
@@ -26,7 +27,7 @@ export default function BacBo() {
   });
 
   const showMonitoring = snapshot.monitoring ?? !snapshot.signal;
-  const activeSignal = snapshot.rawSignal || snapshot.signal;
+  const activeSignal = showMonitoring ? null : snapshot.signal;
 
   return (
     <div
@@ -37,7 +38,7 @@ export default function BacBo() {
     >
       <SignalResultAlert alert={alert} onDismiss={dismiss} />
 
-      <div className="max-w-lg mx-auto px-3 pt-3">
+      <div className="max-w-lg mx-auto px-3 pt-3 space-y-4">
         <BacBoAIPanel
           signal={activeSignal}
           showMonitoring={showMonitoring}
@@ -46,6 +47,8 @@ export default function BacBo() {
           casinoConnected={snapshot.casinoConnected}
           wsConnected={connected}
         />
+
+        <SignalHistory history={snapshot.history} limit={12} />
       </div>
       <BottomNav />
     </div>

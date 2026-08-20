@@ -4,12 +4,12 @@ import { X, Satellite } from 'lucide-react';
 import {
   calculateProbabilities,
   getDisplayPercents,
-  getActiveZone,
-  getEntryZone,
+  getProbabilityBarZone,
   getPredictedZone,
   getStatusLabel,
   getColorConfig,
   getGaleProgress,
+  isMonitoringAnalysis,
 } from '../utils/bacBoStats';
 import { normalizeScoreboard } from '../utils/scoreboard';
 import { getPremiumBadge } from '../utils/playResult';
@@ -281,11 +281,13 @@ function StatusPanel({
   showMonitoring,
   signal,
   galeProgress,
+  monitoringAnalysis,
 }) {
   const resultSummary = signal && (isSuccess || isLoss) ? getHistorySummary(signal) : null;
-  const showColor = predictedZone && !showMonitoring && !isSuccess && !isLoss;
+  const showColor =
+    predictedZone && !showMonitoring && !monitoringAnalysis && !isSuccess && !isLoss;
   const showSatellite =
-    (showMonitoring || (isAnalyzing && !predictedZone)) && !isSuccess && !isLoss;
+    (monitoringAnalysis || (isAnalyzing && !predictedZone)) && !isSuccess && !isLoss;
 
   return (
     <div
@@ -347,7 +349,7 @@ function StatusPanel({
               </motion.div>
             ) : showSatellite ? (
               <motion.div
-                key="satellite"
+                key={`satellite-${showMonitoring}-${monitoringAnalysis}`}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -439,21 +441,24 @@ export default function BacBoAIPanel({
 }) {
   const probs = calculateProbabilities(rounds);
   const percents = getDisplayPercents(signal, probs);
-  const entryZone = getEntryZone(signal);
-  const activeZone = entryZone || getActiveZone(signal);
   const predictedZone = getPredictedZone(signal, showMonitoring);
+  const monitoringAnalysis = isMonitoringAnalysis(signal, showMonitoring);
+  const barZone = getProbabilityBarZone(signal, showMonitoring);
   const { sub, main } = getStatusLabel(signal, showMonitoring);
   const galeProgress = getGaleProgress(signal);
 
-  const isAnalyzing =
-    signal?.signal_status === 'analyzing' ||
-    (showMonitoring && !signal);
-  const isGale = signal?.signal_status === 'gale_update';
+  const isAnalyzing = showMonitoring || monitoringAnalysis || signal?.signal_status === 'analyzing';
+  const isGale = !showMonitoring && !monitoringAnalysis && signal?.signal_status === 'gale_update';
   const isConfirmed =
-    signal?.signal_status === 'confirmed' || isGale;
-  const isResult = signal?.signal_status === 'result';
+    !showMonitoring &&
+    !monitoringAnalysis &&
+    (signal?.signal_status === 'confirmed' || isGale);
+  const isResult =
+    !showMonitoring && !monitoringAnalysis && signal?.signal_status === 'result';
   const isSuccess = isResult && signal.result === 'green';
   const isLoss = isResult && signal.result === 'loss';
+  const panelGaleProgress = showMonitoring || monitoringAnalysis ? null : galeProgress;
+  const barIsAnalyzing = isAnalyzing && !isConfirmed && !isGale && !isResult;
 
   const stats = useMemo(() => normalizeScoreboard(scoreboard), [scoreboard]);
   const premiumBadge = getPremiumBadge(stats.winRate, stats.playsToday);
@@ -488,8 +493,8 @@ export default function BacBoAIPanel({
       <div className="relative px-4 pt-1 pb-3">
         <ProbabilityBar
           percents={percents}
-          activeZone={activeZone}
-          isAnalyzing={signal?.signal_status === 'analyzing'}
+          activeZone={barZone}
+          isAnalyzing={barIsAnalyzing}
           isConfirmed={isConfirmed}
           isGale={isGale}
         />
@@ -526,14 +531,15 @@ export default function BacBoAIPanel({
       <StatusPanel
         sub={sub}
         main={main}
-        isAnalyzing={isAnalyzing || signal?.signal_status === 'analyzing'}
+        isAnalyzing={isAnalyzing}
         isSuccess={isSuccess}
         isLoss={isLoss}
         predictedZone={predictedZone}
         isConfirmed={isConfirmed}
         showMonitoring={showMonitoring}
+        monitoringAnalysis={monitoringAnalysis}
         signal={signal}
-        galeProgress={galeProgress}
+        galeProgress={panelGaleProgress}
       />
     </motion.div>
   );

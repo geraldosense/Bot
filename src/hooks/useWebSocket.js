@@ -121,6 +121,7 @@ export function useWebSocket(options = {}) {
           case 'snapshot':
             setSnapshot((prev) => ({
               ...msg.data,
+              signal: msg.data.monitoring ? null : msg.data.signal,
               scoreboard: applyScoreboard(msg.data.scoreboard),
               gameId: GAME_ID,
             }));
@@ -130,7 +131,7 @@ export function useWebSocket(options = {}) {
             setSnapshot((prev) => ({
               ...prev,
               state: msg.data.state,
-              signal: msg.data.signal ?? prev.signal,
+              signal: msg.data.monitoring ? null : (msg.data.signal ?? prev.signal),
               monitoring: msg.data.monitoring ?? prev.monitoring,
               scoreboard: applyScoreboard(msg.data.scoreboard),
               casinoConnected: msg.data.casinoConnected ?? prev.casinoConnected,
@@ -144,21 +145,30 @@ export function useWebSocket(options = {}) {
             break;
           case 'signal':
             setLastSignal(msg.data);
-            setSnapshot((prev) => ({
-              ...prev,
-              rawSignal: msg.data,
-              signal: msg.data,
-            }));
+            setSnapshot((prev) => {
+              const monitoring =
+                msg.data?.signal_status === 'analyzing' ? true : prev.monitoring;
+              return {
+                ...prev,
+                rawSignal: msg.data,
+                monitoring,
+                signal: monitoring ? null : msg.data,
+              };
+            });
             break;
           case 'play_result':
             onPlayResultRef.current?.(msg.data);
             break;
           case 'casino_status':
-            setSnapshot((prev) => ({
-              ...prev,
-              casinoConnected: msg.data.connected,
-              monitoring: msg.data.monitoring ?? prev.monitoring,
-            }));
+            setSnapshot((prev) => {
+              const monitoring = msg.data.monitoring ?? prev.monitoring;
+              return {
+                ...prev,
+                casinoConnected: msg.data.connected,
+                monitoring,
+                signal: monitoring ? null : (prev.rawSignal ?? prev.signal),
+              };
+            });
             break;
           case 'history':
             patchSnapshot({ history: msg.data });

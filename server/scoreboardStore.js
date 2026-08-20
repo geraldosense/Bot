@@ -8,7 +8,7 @@ import {
   calcWinRate,
   calcTotalsFromPlays,
 } from './playResult.js';
-import { resolveSignalBet } from './signalBet.js';
+import { resolveSignalBet, reconcileSignalResult } from './signalBet.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, 'data');
@@ -99,28 +99,34 @@ export class ScoreboardStore {
   }
 
   recordPlay(signal) {
-    if (!signal?.id) return false;
+    if (!signal?.id || signal.signal_status !== 'result') return false;
 
-    const classified = classifyPlayResult(signal);
-    if (!classified) return false;
+    const reconciled = reconcileSignalResult({ ...signal, signal_status: 'result' });
+    let classified = classifyPlayResult(reconciled);
+    if (!classified) {
+      const r = String(reconciled.result || '').toLowerCase();
+      if (r === 'green') classified = 'green';
+      else if (r === 'loss' || r === 'red') classified = 'loss';
+      else return false;
+    }
 
-    const at = signal.created_date || signal.criado_em || new Date().toISOString();
+    const at = reconciled.created_date || reconciled.criado_em || new Date().toISOString();
     const day = todayKey(new Date(at));
     const bucket = this.dayBucket(day);
 
-    const existingIdx = bucket.plays.findIndex((p) => p.id === String(signal.id));
-    const maxGales = Number.isFinite(Number(signal.gales)) ? Number(signal.gales) : MAX_GALES;
-    const bet = resolveSignalBet(signal) || signal.bet_recommendation || signal.bet || null;
+    const existingIdx = bucket.plays.findIndex((p) => p.id === String(reconciled.id));
+    const maxGales = Number.isFinite(Number(reconciled.gales)) ? Number(reconciled.gales) : MAX_GALES;
+    const bet = resolveSignalBet(reconciled) || reconciled.bet_recommendation || reconciled.bet || null;
 
     const entry = {
-      id: String(signal.id),
+      id: String(reconciled.id),
       result: classified,
       bet,
-      entry_bet: signal.entry_bet || signal.bet || bet,
-      bet_recommendation: signal.bet_recommendation || signal.bet || bet,
-      sequence: signal.sequence || null,
-      entry_condition: signal.entry_condition || null,
-      gale: Number(signal.current_gale) || 0,
+      entry_bet: reconciled.entry_bet || reconciled.bet || bet,
+      bet_recommendation: reconciled.bet_recommendation || reconciled.bet || bet,
+      sequence: reconciled.sequence || null,
+      entry_condition: reconciled.entry_condition || null,
+      gale: Number(reconciled.current_gale) || 0,
       maxGales,
       at,
     };

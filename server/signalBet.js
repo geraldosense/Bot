@@ -24,6 +24,32 @@ function parseBetFromText(raw) {
   return null;
 }
 
+export function parseOutcomeZone(value) {
+  if (value == null || value === '') return null;
+  const raw = String(value).trim();
+  const upper = raw.toUpperCase();
+
+  if (raw.includes('🔵') || upper.includes('AZUL') || upper.includes('JOGADOR') || upper === 'PLAYER') {
+    return 'player';
+  }
+  if (
+    raw.includes('🔴') ||
+    upper.includes('VERMELHO') ||
+    upper.includes('BANCA') ||
+    upper.includes('CASA') ||
+    upper === 'BANKER'
+  ) {
+    return 'banker';
+  }
+  if (raw.includes('🟡') || upper.includes('EMPATE') || upper === 'TIE') {
+    return 'tie';
+  }
+  if (raw === 'Player') return 'player';
+  if (raw === 'Banker') return 'banker';
+  if (raw === 'Tie') return 'tie';
+  return null;
+}
+
 export function resolveSignalBet(rowOrSignal) {
   if (!rowOrSignal) return null;
 
@@ -44,13 +70,74 @@ export function resolveSignalBet(rowOrSignal) {
   return null;
 }
 
+function betToZone(bet) {
+  if (!bet) return null;
+  if (bet === 'Player') return 'player';
+  if (bet === 'Banker') return 'banker';
+  if (bet === 'Tie') return 'tie';
+  return parseOutcomeZone(bet);
+}
+
+function parseResultFlag(row) {
+  const raw = String(row?.result || '').toLowerCase();
+  if (raw === 'green') return 'green';
+  if (raw === 'loss' || raw === 'red') return 'loss';
+
+  const rv = String(row?.result_value || '').toLowerCase();
+  if (!rv) return null;
+  if (rv.includes('green') || rv.includes('acert') || rv.includes('win')) return 'green';
+  if (rv.includes('loss') || rv.includes('red') || rv.includes('perd')) return 'loss';
+
+  return null;
+}
+
+function resolveOutcomeZone(signal) {
+  return (
+    parseOutcomeZone(signal?.result_value) ||
+    parseOutcomeZone(signal?.actual_outcome) ||
+    parseOutcomeZone(signal?.sequence?.split(/\s+/).pop()) ||
+    parseOutcomeZone(signal?.entry_condition)
+  );
+}
+
+/** Alinha green/loss com a cor apostada vs cor que saiu na mesa */
+export function reconcileSignalResult(signal) {
+  if (!signal || signal.signal_status !== 'result') return signal;
+
+  const betZone = betToZone(resolveSignalBet(signal));
+  const outcomeZone = resolveOutcomeZone(signal);
+  let result = parseResultFlag(signal);
+
+  if (betZone && outcomeZone) {
+    if (betZone === outcomeZone) {
+      result = 'green';
+    } else if (outcomeZone === 'tie' && betZone !== 'tie') {
+      result = 'loss';
+    } else if (betZone !== outcomeZone) {
+      result = 'loss';
+    }
+  }
+
+  if (!result) {
+    result = parseResultFlag(signal) || 'loss';
+  }
+
+  return {
+    ...signal,
+    result,
+    bet: signal.bet || resolveSignalBet(signal),
+    entry_bet: signal.entry_bet || signal.bet || resolveSignalBet(signal),
+    actual_outcome: outcomeZone || signal.actual_outcome,
+  };
+}
+
 export function mergeSignalRecords(primary, secondary) {
-  if (!secondary) return primary;
-  if (!primary) return secondary;
+  if (!secondary) return reconcileSignalResult(primary);
+  if (!primary) return reconcileSignalResult(secondary);
 
   const bet = resolveSignalBet(primary) || resolveSignalBet(secondary);
 
-  return {
+  const merged = {
     ...primary,
     ...secondary,
     bet: primary.bet || secondary.bet || bet,
@@ -66,6 +153,8 @@ export function mergeSignalRecords(primary, secondary) {
     gales: secondary.gales ?? primary.gales,
     created_date: secondary.created_date || primary.created_date,
   };
+
+  return reconcileSignalResult(merged);
 }
 
 export function historyFingerprint(signal) {

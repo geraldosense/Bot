@@ -101,6 +101,7 @@ export function betToZone(bet) {
 
 export function getEntryZone(signal) {
   if (!signal) return null;
+  if (signal.signal_status === 'analyzing') return null;
 
   const candidates = [
     signal.entry_bet,
@@ -121,11 +122,27 @@ export function getEntryZone(signal) {
 export function getActiveZone(signal) {
   if (!signal) return null;
 
+  if (signal.signal_status === 'analyzing') {
+    return betToZone(signal.analysis?.bet);
+  }
+
   if (['confirmed', 'gale_update', 'result'].includes(signal.signal_status)) {
     return getEntryZone(signal);
   }
 
   return betToZone(signal.bet_recommendation || signal.bet || signal.analysis?.bet);
+}
+
+/** Zona destacada nas barras JOGADOR | EMPATE | CASA */
+export function getProbabilityBarZone(signal, showMonitoring) {
+  if (!signal || showMonitoring) return null;
+  if (signal.signal_status === 'analyzing') {
+    return betToZone(signal.analysis?.bet);
+  }
+  if (['confirmed', 'gale_update', 'result'].includes(signal.signal_status)) {
+    return getEntryZone(signal);
+  }
+  return null;
 }
 
 /** Cor prevista para mostrar na área de análise (como moneytix / Evolution) */
@@ -145,6 +162,15 @@ export function getPredictedZone(signal, showMonitoring) {
   }
 
   return null;
+}
+
+/** Modo satélite — aguardando / analisando mesa (sem cor de entrada anterior) */
+export function isMonitoringAnalysis(signal, showMonitoring) {
+  if (showMonitoring || !signal) return true;
+  if (signal.signal_status === 'analyzing') {
+    return !betToZone(signal.analysis?.bet);
+  }
+  return false;
 }
 
 /** 3 gales — só após falha da entrada inicial (entrada = cor PREVISÃO, não barra) */

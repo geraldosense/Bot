@@ -103,7 +103,14 @@ export default function SignalHistory({
 }) {
   const [expanded, setExpanded] = useState(false);
   const results = dedupeHistorySignals(
-    (history || []).filter((s) => s.signal_status === 'result'),
+    (history || []).filter(
+      (s) =>
+        s?.id &&
+        (s.signal_status === 'result' ||
+          s.result === 'green' ||
+          s.result === 'loss' ||
+          s.result === 'red'),
+    ),
   );
 
   const visible = expanded ? results : results.slice(0, limit);

@@ -10,6 +10,30 @@ export function isSignalGreen(signal) {
   return String(signal?.result || '').toLowerCase() === 'green';
 }
 
+/** Garante green/loss coerente com aposta vs resultado real da mesa */
+export function reconcileHistorySignal(signal) {
+  if (!signal || signal.signal_status !== 'result') return signal;
+
+  const betZone = getSignalBetColor(signal)?.zone;
+  const outcomeZone = getSignalOutcomeColor(signal)?.zone;
+  let result = String(signal.result || '').toLowerCase();
+
+  if (result !== 'green' && result !== 'loss') {
+    const rv = String(signal.result_value || '').toLowerCase();
+    if (rv.includes('green') || rv.includes('acert') || rv.includes('win')) result = 'green';
+    else if (rv.includes('loss') || rv.includes('red') || rv.includes('perd')) result = 'loss';
+    else result = '';
+  }
+
+  if (betZone && outcomeZone) {
+    result = betZone === outcomeZone ? 'green' : 'loss';
+  }
+
+  if (!result) result = 'loss';
+
+  return { ...signal, result };
+}
+
 export function getResultLabel(signal) {
   return isSignalGreen(signal) ? 'GREEN' : 'RED';
 }
@@ -239,17 +263,18 @@ export function getGalePathDots(signal) {
 }
 
 export function getHistorySummary(signal) {
-  const bet = getSignalBetColor(signal);
-  const outcome = getSignalOutcomeColor(signal);
-  const highlight = getResultHighlightColor(signal);
-  const resultLabel = getResultLabel(signal);
-  const styles = getResultStyles(signal);
-  const galeLine = getGaleResultLine(signal);
-  const isGreen = isSignalGreen(signal);
-  const galePath = getGalePathDots(signal);
-  const sequence = getTriggerSequence(signal, 3);
-  const playOutcomes = getPlayOutcomes(signal);
-  const betAttempts = getPlayBetAttempts(signal);
+  const normalized = reconcileHistorySignal(signal);
+  const bet = getSignalBetColor(normalized);
+  const outcome = getSignalOutcomeColor(normalized);
+  const highlight = getResultHighlightColor(normalized);
+  const resultLabel = getResultLabel(normalized);
+  const styles = getResultStyles(normalized);
+  const galeLine = getGaleResultLine(normalized);
+  const isGreen = isSignalGreen(normalized);
+  const galePath = getGalePathDots(normalized);
+  const sequence = getTriggerSequence(normalized, 3);
+  const playOutcomes = getPlayOutcomes(normalized);
+  const betAttempts = getPlayBetAttempts(normalized);
 
   return {
     bet,
@@ -260,12 +285,12 @@ export function getHistorySummary(signal) {
     styles,
     galeLine,
     isGreen,
-    colorCaption: getResultColorCaption(signal),
+    colorCaption: getResultColorCaption(normalized),
     galePath,
     sequence,
     playOutcomes,
     betAttempts,
     betZone: bet?.zone || null,
-    attemptLabel: formatAttemptLabel(signal?.current_gale),
+    attemptLabel: formatAttemptLabel(normalized?.current_gale),
   };
 }

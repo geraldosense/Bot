@@ -1,6 +1,6 @@
 /** Regras: entrada inicial + gales só após falha (API current_gale 0 = entrada) */
 
-export const MAX_GALES = 2;
+export const MAX_GALES = 3;
 export const GALE_ATTEMPTS = MAX_GALES + 1;
 export const ATTEMPT_LABELS = ['ENTRADA', '1° GALE', '2° GALE', '3° GALE'];
 export const GALE_ONLY_LABELS = ['1° GALE', '2° GALE', '3° GALE'];
