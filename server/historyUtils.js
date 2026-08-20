@@ -1,4 +1,4 @@
-/** Regras de histórico alinhadas ao moneytix01.com/Dashboard */
+/** Regras de histórico de entradas do robô */
 
 export const PARTIAL_SCOREBOARD_MSG = 'Até agora estamos com';
 
@@ -22,7 +22,7 @@ export function isRobotHistorySignal(signal) {
   return Boolean(signal.result_value);
 }
 
-/** MoneyTix: se result não tem sequence, usa a do confirmed anterior */
+/** Se result não tem sequence, usa a do confirmed anterior */
 export function backfillSequenceFromContext(signal, contextSignals = []) {
   if (signal?.sequence) return signal;
 

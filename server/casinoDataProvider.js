@@ -85,7 +85,7 @@ export async function fetchLatestCasinoSignal(gameId = GAME_ID) {
   }
 }
 
-/** Placar diário moneytix — último sinal com scoreboard_green preenchido pela IA */
+/** Placar diário — último sinal com scoreboard_green preenchido pela IA */
 export async function fetchCasinoScoreboard(gameId = GAME_ID) {
   try {
     const url =
@@ -252,7 +252,7 @@ function parseResultFlag(row) {
   return null;
 }
 
-/** Lógica igual ao moneytix — quando mostrar monitoramento vs sinal */
+/** Quando mostrar monitoramento vs sinal activo */
 export function shouldShowMonitoring(signal) {
   if (!signal) return true;
 

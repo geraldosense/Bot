@@ -145,7 +145,7 @@ export function getProbabilityBarZone(signal, showMonitoring) {
   return null;
 }
 
-/** Cor prevista para mostrar na área de análise (como moneytix / Evolution) */
+/** Cor prevista para mostrar na área de análise (Evolution Bac Bo) */
 export function getPredictedZone(signal, showMonitoring) {
   if (!signal || showMonitoring) return null;
 

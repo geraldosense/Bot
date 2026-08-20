@@ -12,7 +12,7 @@ export function formatWinRate(value) {
   return Number.isInteger(n) ? `${n}%` : `${n.toFixed(1)}%`;
 }
 
-/** Formato moneytix — ex: 96.10% */
+/** Formato preciso — ex: 96.10% */
 export function formatWinRatePrecise(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return '0.00%';

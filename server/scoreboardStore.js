@@ -61,7 +61,7 @@ function writeStore(data) {
 
 /**
  * Histórico persistente — fonte única no servidor.
- * Totais moneytix têm prioridade; nunca regredir para contagem parcial.
+ * Totais IA do casino têm prioridade; nunca regredir para contagem parcial.
  */
 export class ScoreboardStore {
   constructor(gameId = 'bac_bo') {

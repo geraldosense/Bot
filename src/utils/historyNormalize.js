@@ -7,7 +7,7 @@ export function isPartialScoreboardSignal(signal) {
   return String(raw).includes(PARTIAL_SCOREBOARD_MSG);
 }
 
-/** 1 linha = 1 entrada finalizada pelo robô (igual MoneyTix) */
+/** 1 linha = 1 entrada finalizada pelo robô */
 export function isRobotHistorySignal(signal) {
   if (!signal?.id) return false;
   if (isPartialScoreboardSignal(signal)) return false;
@@ -59,7 +59,7 @@ function mergeHistoryRecords(prev, next) {
   });
 }
 
-/** Lista final — dedupe por id, filtro MoneyTix, backfill sequence */
+/** Lista final — dedupe por id, filtro de entradas válidas, backfill sequence */
 export function normalizeHistoryList(signals = []) {
   const context = [...signals];
   const byId = new Map();
@@ -103,7 +103,7 @@ export function computeHistoryStats(signals = []) {
   return { list, greens, losses, reds: losses, total, winRate };
 }
 
-/** Placar MoneyTix — preferir totais IA do casino quando existem */
+/** Placar — preferir totais IA do casino quando existem */
 export function resolveHistoryScoreboard(historySignals = [], scoreboard = null) {
   const sbTotal = (Number(scoreboard?.greens) || 0) + (Number(scoreboard?.reds) || 0);
   if (sbTotal > 0 && scoreboard?.source === 'casino_ia') {

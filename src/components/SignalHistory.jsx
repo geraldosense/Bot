@@ -2,7 +2,7 @@ import { useMemo, useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, ChevronDown, ChevronUp, History, Wifi, X } from 'lucide-react';
 import { formatTime } from '../hooks/useWebSocket';
-import { getMoneytixHistorySummary } from '../utils/signalResult';
+import { getHistoryEntrySummary } from '../utils/signalResult';
 import {
   normalizeHistoryList,
   computeHistoryStats,
@@ -16,9 +16,9 @@ const RESULT_FILTERS = [
   { id: 'loss', label: 'LOSS' },
 ];
 
-/** Linha igual ao moneytix01.com — 1 entrada do robô por linha */
-function HistoryRowMoneyTix({ signal, index, total, isLatest, live, expanded, onToggle }) {
-  const summary = getMoneytixHistorySummary(signal);
+/** Uma linha = 1 entrada finalizada pelo robô */
+function HistoryEntryRow({ signal, index, total, isLatest, live, expanded, onToggle }) {
+  const summary = getHistoryEntrySummary(signal);
   const { bet, isGreen, resultLabel, resultEmoji, sequenceRaw, saiu, gales, tieProtection, boardG, boardR, boardWr, resultHint } =
     summary;
 
@@ -238,7 +238,7 @@ export default function SignalHistory({
           Sem entradas do robô hoje
         </p>
         <p className="text-zinc-600 text-xs mt-1 max-w-xs mx-auto">
-          Cada entrada confirmada e finalizada pela IA aparece aqui — igual ao MoneyTix
+          Cada entrada confirmada e finalizada pela IA aparece aqui em tempo real
         </p>
       </div>
     );
@@ -333,7 +333,7 @@ export default function SignalHistory({
             visible.map((sig, i) => {
               const id = String(sig.id);
               return (
-                <HistoryRowMoneyTix
+                <HistoryEntryRow
                   key={id}
                   signal={sig}
                   index={i}

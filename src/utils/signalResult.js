@@ -67,12 +67,12 @@ export function getResultEmoji(signal) {
   return isSignalGreen(signal) ? '✅' : '❌';
 }
 
-/** Seq MoneyTix — string bruta do casino */
-export function getMoneytixSequenceDisplay(signal) {
+/** String bruta da sequência vinda do casino */
+export function getRawSequenceDisplay(signal) {
   return signal?.sequence || signal?.entry_condition || '—';
 }
 
-/** "Saiu AZUL/VERMELHO" — parse MoneyTix a partir de sequence/result_value */
+/** "Saiu AZUL/VERMELHO" — parse a partir de sequence/result_value */
 export function parseSaiuLabel(signal) {
   const outcome = getSignalOutcomeColor(signal);
   if (outcome?.label) return outcome.label;
@@ -86,11 +86,11 @@ export function parseSaiuLabel(signal) {
   return null;
 }
 
-export function getMoneytixHistorySummary(signal) {
+export function getHistoryEntrySummary(signal) {
   const normalized = reconcileHistorySignal(signal);
   const bet = getSignalBetColor(normalized);
   const isGreen = isSignalGreen(normalized);
-  const sequenceRaw = getMoneytixSequenceDisplay(normalized);
+  const sequenceRaw = getRawSequenceDisplay(normalized);
   const saiu = parseSaiuLabel(normalized);
   const gales = Number(normalized.gales) || 3;
   const currentGale = Number(normalized.current_gale) || 0;
@@ -301,7 +301,7 @@ export function parseSequenceZones(signal, max = 3) {
   return all.slice(-max);
 }
 
-/** Seq — últimas 3 cores da mesa ANTES da entrada (MoneyTix) */
+/** Seq — últimas 3 cores da mesa ANTES da entrada */
 export function getTriggerSequence(signal, max = 3) {
   const all = parseAllSequenceZones(signal);
   const attempts = Math.min(4, (Number(signal?.current_gale) || 0) + 1);

@@ -1,4 +1,4 @@
-/** Dia operacional alinhado ao moneytix (Brasil UTC-3 por defeito) */
+/** Dia operacional Brasil (UTC-3 por defeito) */
 export const SCOREBOARD_TZ = process.env.SCOREBOARD_TZ || 'America/Sao_Paulo';
 export const SCOREBOARD_UTC_OFFSET = Number(process.env.SCOREBOARD_UTC_OFFSET ?? -3);
 
