@@ -1,30 +1,33 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { classifyPlayResult } from '../utils/playResult';
+import { resolveAlertOutcome } from '../utils/playResult';
 import { getGaleResultLine, getAlertDisplayColor, reconcileHistorySignal } from '../utils/signalResult';
 import { playWinAlertSound, playLossAlertSound, vibrateForOutcome, unlockAlertSound } from '../utils/signalAlertSound';
 
-const ALERT_TTL_MS = 6000;
+const ALERT_TTL_MS = 10000;
 
 function buildAlertFromSignal(signal) {
   const normalized = reconcileHistorySignal({ ...signal, signal_status: 'result' });
-  const outcome = classifyPlayResult(normalized);
+  const outcome = resolveAlertOutcome(normalized);
   if (!outcome) return null;
 
   const isGreen = outcome === 'green';
   const color = getAlertDisplayColor(normalized, outcome);
+  const attemptLine = getGaleResultLine(normalized);
 
   return {
     id: `${normalized.id}-${outcome}`,
     outcome,
-    title: isGreen ? 'ACERTOU' : 'PERDEU',
-    message: getGaleResultLine(normalized),
+    title: isGreen ? 'ACERTOU ✓' : 'PERDEU ✗',
+    message: isGreen
+      ? `Entrada confirmada — ${attemptLine.toLowerCase()}`
+      : `Entrada perdida — ${attemptLine.toLowerCase()}`,
     sub: color
       ? isGreen
-        ? `Cor acertada: ${color.label}`
-        : `Entrada: ${color.label}`
+        ? `Cor acertada: ${color.emoji} ${color.label}`
+        : `Apostou: ${color.emoji} ${color.label}`
       : isGreen
-        ? 'Entrada confirmada pela IA'
-        : 'Errou na entrada e nos 3 gales',
+        ? 'Resultado GREEN confirmado pela mesa'
+        : 'Resultado RED confirmado pela mesa',
     signal: normalized,
     at: Date.now(),
   };
@@ -57,7 +60,7 @@ export function useSignalAlerts({ enabled = true } = {}) {
       const built = payload.alert
         ? {
             id: key,
-            outcome: payload.outcome,
+            outcome: payload.outcome || resolveAlertOutcome(payload.signal),
             title: payload.alert.title,
             message: payload.alert.message,
             sub: payload.alert.sub,
@@ -69,7 +72,7 @@ export function useSignalAlerts({ enabled = true } = {}) {
           }
         : buildAlertFromSignal(payload.signal);
 
-      if (!built) return;
+      if (!built || !built.outcome) return;
 
       setAlert(built);
 

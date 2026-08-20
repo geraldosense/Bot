@@ -1,6 +1,6 @@
-import { useCallback, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
-import { useSignalAlerts } from '../hooks/useSignalAlerts';
+import { useResultAlerts } from '../hooks/useResultAlerts';
 import BacBoAIPanel from '../components/BacBoAIPanel';
 import SignalHistory from '../components/SignalHistory';
 import SignalResultAlert from '../components/SignalResultAlert';
@@ -8,21 +8,11 @@ import BottomNav from '../components/BottomNav';
 
 /** Página dedicada do robô — só abre via botão no Dashboard */
 export default function BacBo() {
-  const { alert, showAlert, dismiss, seedSeen } = useSignalAlerts({ enabled: true });
-
-  const handleSnapshot = useCallback(
-    (data) => {
-      const ids = (data.history || []).map((s) => s.id);
-      if (data.rawSignal?.signal_status === 'result' && data.rawSignal?.id) {
-        ids.push(data.rawSignal.id);
-      }
-      seedSeen(ids);
-    },
-    [seedSeen],
-  );
+  const { alert, dismiss, handlePlayResult, handleHistory, handleSnapshot } = useResultAlerts();
 
   const { connected, snapshot, refreshHistory } = useWebSocket({
-    onPlayResult: showAlert,
+    onPlayResult: handlePlayResult,
+    onHistory: handleHistory,
     onSnapshot: handleSnapshot,
   });
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { normalizeScoreboard } from '../utils/scoreboard';
+import { normalizeHistoryList } from '../utils/historyNormalize';
 
 const GAME_ID = 'bac_bo';
 
@@ -38,14 +39,16 @@ function applyServerScoreboard(ref, incoming) {
 }
 
 export function useWebSocket(options = {}) {
-  const { onPlayResult, onSnapshot } = options;
+  const { onPlayResult, onSnapshot, onHistory } = options;
   const onPlayResultRef = useRef(onPlayResult);
   const onSnapshotRef = useRef(onSnapshot);
+  const onHistoryRef = useRef(onHistory);
 
   useEffect(() => {
     onPlayResultRef.current = onPlayResult;
     onSnapshotRef.current = onSnapshot;
-  }, [onPlayResult, onSnapshot]);
+    onHistoryRef.current = onHistory;
+  }, [onPlayResult, onSnapshot, onHistory]);
   const { token, isVip } = useAuth();
   const wsRef = useRef(null);
   const scoreboardRef = useRef(normalizeScoreboard());
@@ -122,6 +125,7 @@ export function useWebSocket(options = {}) {
             setSnapshot((prev) => ({
               ...msg.data,
               signal: msg.data.monitoring ? null : msg.data.signal,
+              history: normalizeHistoryList(msg.data.history || []),
               scoreboard: applyScoreboard(msg.data.scoreboard),
               gameId: GAME_ID,
             }));
@@ -171,7 +175,8 @@ export function useWebSocket(options = {}) {
             });
             break;
           case 'history':
-            patchSnapshot({ history: msg.data });
+            patchSnapshot({ history: normalizeHistoryList(msg.data || []) });
+            onHistoryRef.current?.(msg.data);
             break;
           case 'scoreboard':
             patchSnapshot({ scoreboard: applyScoreboard(msg.data) });
@@ -221,7 +226,7 @@ export function useWebSocket(options = {}) {
       if (!res.ok) return;
       const data = await res.json();
       patchSnapshot({
-        history: data.history || [],
+        history: normalizeHistoryList(data.history || []),
         scoreboard: applyScoreboard(data.scoreboard),
         monitoring: data.monitoring ?? undefined,
       });

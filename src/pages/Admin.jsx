@@ -15,6 +15,7 @@ import {
   BarChart3,
   Circle,
   RefreshCw,
+  Medal,
 } from 'lucide-react';
 import { useAuth, authHeaders } from '../context/AuthContext';
 import BottomNav from '../components/BottomNav';
@@ -25,6 +26,7 @@ const ROLE_LABEL = {
   member: 'Membro',
   vip: 'VIP',
   admin: 'Administrador',
+  manager: 'Gerente',
   super_admin: 'Proprietário',
 };
 
@@ -68,7 +70,16 @@ function ActivityBadge({ activity }) {
 }
 
 export default function Admin() {
-  const { token, isSuperAdmin, canRequestVip, canViewActive, loading: authLoading } = useAuth();
+  const {
+    token,
+    isOwner,
+    isManager,
+    canManageAccounts,
+    canManageManagers,
+    canRequestVip,
+    canViewActive,
+    loading: authLoading,
+  } = useAuth();
   const [users, setUsers] = useState([]);
   const [stats, setStats] = useState(null);
   const [vipRequests, setVipRequests] = useState([]);
@@ -85,8 +96,8 @@ export default function Admin() {
 
   useEffect(() => {
     if (authLoading) return;
-    setTab(isSuperAdmin ? 'vip-requests' : 'members');
-  }, [isSuperAdmin, authLoading]);
+    setTab(canManageAccounts ? 'vip-requests' : 'members');
+  }, [canManageAccounts, authLoading]);
 
   const buildStatsFromUsers = (list, iaList = [], iaConnections = 0) => {
     const onlineNow = list.filter((u) => u.activity?.online).length;
@@ -95,6 +106,7 @@ export default function Admin() {
       members: list.filter((u) => u.role === 'member').length,
       vip: list.filter((u) => u.role === 'vip').length,
       admins: list.filter((u) => u.role === 'admin').length,
+      managers: list.filter((u) => u.role === 'manager').length,
       vipRequests: list.filter((u) => u.vipRequest?.status === 'pending').length,
       onlineNow,
       iaActiveNow: iaList.length,
@@ -109,7 +121,7 @@ export default function Admin() {
       setLoadError('');
       const opts = { headers: authHeaders(token), timeout: 25000 };
 
-      if (isSuperAdmin) {
+      if (canManageAccounts) {
         let overview = null;
         try {
           overview = await fetchJson('/api/admin/overview', opts);
@@ -185,7 +197,7 @@ export default function Admin() {
     load();
     const t = setInterval(load, 10000);
     return () => clearInterval(t);
-  }, [token, isSuperAdmin, canRequestVip, canViewActive, authLoading]);
+  }, [token, canManageAccounts, canRequestVip, canViewActive, authLoading]);
 
   const approve = async (id) => {
     try {
@@ -304,6 +316,46 @@ export default function Admin() {
     }
   };
 
+  const promoteManager = async (id, name) => {
+    if (
+      !confirm(
+        `Promover ${name || 'este VIP'} a Gerente? Terá quase todas as funções do Proprietário e será superior aos admins.`,
+      )
+    ) {
+      return;
+    }
+    try {
+      const d = await fetchJson(`/api/admin/promote-manager/${id}`, {
+        method: 'POST',
+        headers: authHeaders(token),
+      });
+      setMsg(d.message || d.error);
+      load();
+    } catch (err) {
+      setMsg(err.message);
+    }
+  };
+
+  const demoteManagerRole = async (id, name) => {
+    if (
+      !confirm(
+        `Rebaixar ${name || 'este gerente'}? Volta a membro VIP — só tu como Proprietário podes fazer isto.`,
+      )
+    ) {
+      return;
+    }
+    try {
+      const d = await fetchJson(`/api/admin/users/${id}/demote-manager`, {
+        method: 'POST',
+        headers: authHeaders(token),
+      });
+      setMsg(d.message || d.error);
+      load();
+    } catch (err) {
+      setMsg(err.message);
+    }
+  };
+
   const promoteAdmin = async (id) => {
     try {
       const d = await fetchJson(`/api/admin/promote-admin/${id}`, {
@@ -335,6 +387,7 @@ export default function Admin() {
   const pending = users.filter((u) => u.role === 'member');
   const vips = users.filter((u) => u.role === 'vip');
   const admins = users.filter((u) => u.role === 'admin');
+  const managers = users.filter((u) => u.role === 'manager');
 
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -344,7 +397,7 @@ export default function Admin() {
     );
   }, [users, search]);
 
-  const adminMemberList = isSuperAdmin ? pending : members;
+  const adminMemberList = canManageAccounts ? pending : members;
 
   return (
     <div className="min-h-screen pb-28 bg-zinc-950">
@@ -353,12 +406,14 @@ export default function Admin() {
           <div className="min-w-0">
             <h1 className="text-xl font-black text-white flex items-center gap-2">
               <Shield className="w-6 h-6 text-purple-400 shrink-0" />
-              {isSuperAdmin ? 'Centro de Controlo' : 'Painel Admin'}
+              {canManageAccounts ? 'Centro de Controlo' : 'Painel Admin'}
             </h1>
             <p className="text-zinc-500 text-xs mt-1">
-              {isSuperAdmin
-                ? 'Todos os registos, emails e utilização da IA'
-                : 'Solicita VIP ou exoneração — o Proprietário aprova'}
+              {canManageAccounts
+                ? isOwner
+                  ? 'Proprietário — controlo total, geres gerentes e admins'
+                  : 'Gerente — aprovas VIP, exonerações e geres admins (abaixo do Proprietário)'
+                : 'Solicita VIP ou exoneração — Proprietário ou Gerente aprova'}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -371,9 +426,14 @@ export default function Admin() {
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
-            {isSuperAdmin && (
+            {isOwner && (
               <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2.5 py-1 rounded-full font-bold">
                 👑 PROPRIETÁRIO
+              </span>
+            )}
+            {isManager && (
+              <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2.5 py-1 rounded-full font-bold">
+                🎖 GERENTE
               </span>
             )}
           </div>
@@ -391,13 +451,13 @@ export default function Admin() {
           </p>
         )}
 
-        {isSuperAdmin && storageMode === 'file' && (
+        {canManageAccounts && storageMode === 'file' && (
           <p className="text-amber-300 text-xs bg-amber-500/10 border border-amber-500/25 py-2.5 px-3 rounded-lg">
             Base de dados temporária — configura Supabase para guardar registos permanentemente.
           </p>
         )}
 
-        {isSuperAdmin && (
+        {canManageAccounts && (
           <div className="rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-900/40 to-zinc-900 p-4 text-center">
             <p className="text-zinc-400 text-xs font-bold uppercase tracking-wider">
               Pessoas registadas no site
@@ -411,7 +471,7 @@ export default function Admin() {
           </div>
         )}
 
-        {isSuperAdmin && (
+        {canManageAccounts && (
           <>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
@@ -455,13 +515,16 @@ export default function Admin() {
           </>
         )}
 
-        {isSuperAdmin && stats && (
+        {canManageAccounts && stats && (
           <div className="grid grid-cols-2 gap-2">
             <StatCard icon={Users} label="Contas registadas" value={stats.total} color="text-white" />
             <StatCard icon={Activity} label="Online agora" value={stats.onlineNow} color="text-cyan-400" />
             <StatCard icon={BarChart3} label="IA activa agora" value={stats.iaActiveNow} color="text-emerald-400" />
             <StatCard icon={Crown} label="Contas VIP" value={stats.vip} color="text-amber-400" />
             <StatCard icon={UserCheck} label="Membros" value={stats.members} color="text-zinc-300" />
+            {stats.managers != null && stats.managers > 0 && (
+              <StatCard icon={Medal} label="Gerentes" value={stats.managers} color="text-indigo-300" />
+            )}
             <StatCard icon={Send} label="Pedidos VIP" value={stats.vipRequests} color="text-purple-300" />
             <StatCard
               icon={X}
@@ -472,7 +535,7 @@ export default function Admin() {
           </div>
         )}
 
-        {(isSuperAdmin || canViewActive) && (
+        {(canManageAccounts || canViewActive) && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -512,7 +575,7 @@ export default function Admin() {
           </motion.div>
         )}
 
-        {isSuperAdmin && (
+        {canManageAccounts && (
           <>
             <div className="flex gap-2 overflow-x-auto pb-1">
               {[
@@ -524,6 +587,9 @@ export default function Admin() {
                 { id: 'pending', label: `Membros (${pending.length})` },
                 { id: 'vip', label: `VIP (${vips.length})` },
                 { id: 'admins', label: `Admins (${admins.length})` },
+                ...(canManageManagers
+                  ? [{ id: 'managers', label: `Gerentes (${managers.length})` }]
+                  : []),
               ].map((t) => (
                 <button
                   key={t.id}
@@ -631,13 +697,21 @@ export default function Admin() {
               <Section title="Utilizadores VIP" empty="Nenhum VIP aprovado" count={vips.length}>
                 {vips.map((u) => (
                   <UserCard key={u.id} user={u} badge="VIP">
-                    <div className="flex gap-2 shrink-0">
+                    <div className="flex flex-wrap gap-2 shrink-0 justify-end">
                       <button
                         onClick={() => promoteAdmin(u.id)}
                         className="flex items-center gap-1 px-2.5 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white text-[10px] font-bold transition-colors"
                       >
                         <UserPlus className="w-3 h-3" /> Admin
                       </button>
+                      {canManageManagers && (
+                        <button
+                          onClick={() => promoteManager(u.id, u.name)}
+                          className="flex items-center gap-1 px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white text-[10px] font-bold transition-colors"
+                        >
+                          <Medal className="w-3 h-3" /> Gerente
+                        </button>
+                      )}
                       <button
                         onClick={() => revoke(u.id, u.name)}
                         className="flex items-center gap-1 px-2.5 py-1.5 bg-red-600/90 hover:bg-red-600 rounded-lg text-white text-[10px] font-bold transition-colors"
@@ -693,10 +767,30 @@ export default function Admin() {
                 ))}
               </Section>
             )}
+
+            {tab === 'managers' && canManageManagers && (
+              <Section title="Gerentes" empty="Nenhum gerente" count={managers.length}>
+                {managers.map((u) => (
+                  <UserCard key={u.id} user={u} badge="GERENTE">
+                    <button
+                      type="button"
+                      onClick={() => demoteManagerRole(u.id, u.name)}
+                      className="flex items-center gap-1 px-3 py-2 bg-red-600/90 hover:bg-red-600 rounded-lg text-white text-xs font-bold transition-colors shrink-0"
+                    >
+                      <X className="w-3.5 h-3.5" /> Rebaixar
+                    </button>
+                  </UserCard>
+                ))}
+                <p className="text-zinc-600 text-[10px] text-center px-2">
+                  Gerentes têm quase todas as funções do Proprietário e são superiores aos admins. Só tu
+                  como Proprietário podes nomear ou rebaixar gerentes.
+                </p>
+              </Section>
+            )}
           </>
         )}
 
-        {!isSuperAdmin && canRequestVip && (
+        {!canManageAccounts && canRequestVip && (
           <>
             <div className="flex gap-2 overflow-x-auto pb-1">
               <button
@@ -735,7 +829,7 @@ export default function Admin() {
                   >
                     {u.vipRequest?.status === 'pending' ? (
                       <span className="text-amber-400 text-[10px] font-bold shrink-0 px-2">
-                        Aguarda Proprietário
+                        Aguarda Proprietário ou Gerente
                       </span>
                     ) : (
                       <button
@@ -810,6 +904,14 @@ function Section({ title, empty, count, children }) {
   );
 }
 
+function roleBadgeClass(role) {
+  if (role === 'super_admin') return 'bg-amber-500/20 text-amber-300';
+  if (role === 'manager') return 'bg-indigo-500/20 text-indigo-300';
+  if (role === 'admin') return 'bg-purple-500/20 text-purple-300';
+  if (role === 'vip') return 'bg-emerald-500/20 text-emerald-300';
+  return 'bg-zinc-700/50 text-zinc-400';
+}
+
 function AccountRow({ user, children, compact = false }) {
   return (
     <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-3 space-y-2">
@@ -817,7 +919,7 @@ function AccountRow({ user, children, compact = false }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-white font-bold text-sm">{user.name}</p>
-            <span className="text-[9px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded font-bold">
+            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${roleBadgeClass(user.role)}`}>
               {ROLE_LABEL[user.role] || getRoleLabel(user.role)}
             </span>
             <ActivityBadge activity={user.activity} />

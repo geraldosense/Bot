@@ -8,7 +8,7 @@ import WhatsAppGroupCard from '../components/WhatsAppGroupCard';
 import { getRoleLabel } from '../utils/roles';
 
 export default function Profile() {
-  const { user, logout, isVip, isAdmin, isSuperAdmin, refreshUser } = useAuth();
+  const { user, logout, isVip, isAdmin, isOwner, isManager, refreshUser } = useAuth();
   const [checking, setChecking] = useState(false);
 
   const memberSince = user?.createdAt
@@ -94,11 +94,13 @@ export default function Profile() {
             </div>
           </div>
 
-          {(isAdmin || isSuperAdmin) && (
+          {(isAdmin || isOwner) && (
             <p className="text-purple-400 text-xs text-center font-bold">
-              {isSuperAdmin
-                ? '👑 Proprietário — aprovas VIP, exonerações e geres admins'
-                : '🛡️ Admin — podes solicitar VIP ou exoneração com aprovação do Proprietário'}
+              {isOwner
+                ? '👑 Proprietário — controlo absoluto, geres gerentes e admins (nunca podes ser exonerado)'
+                : isManager
+                  ? '🎖 Gerente — aprovas VIP, exonerações e geres admins (superior aos admins, abaixo do Proprietário)'
+                  : '🛡️ Admin — podes solicitar VIP ou exoneração com aprovação do Proprietário ou Gerente'}
             </p>
           )}
         </motion.div>

@@ -46,15 +46,61 @@ export function computeHistoryStats(signals = []) {
   const list = normalizeHistoryList(signals);
   let greens = 0;
   let reds = 0;
+  let g0Wins = 0;
+  let galeWins = 0;
+  let galeLosses = 0;
 
   for (const signal of list) {
     const summary = getHistorySummary(signal);
-    if (summary.isGreen) greens++;
-    else reds++;
+    const gale = Number(signal.current_gale) || 0;
+    if (summary.isGreen) {
+      greens++;
+      if (gale === 0) g0Wins++;
+      else galeWins++;
+    } else {
+      reds++;
+      if (gale > 0) galeLosses++;
+    }
   }
 
   const total = greens + reds;
   const winRate = total ? Math.min(100, Math.round((greens / total) * 10000) / 100) : 0;
+  const streak = computeHistoryStreak(list);
 
-  return { list, greens, reds, total, winRate };
+  return { list, greens, reds, total, winRate, g0Wins, galeWins, galeLosses, streak };
+}
+
+/** Sequência actual de GREEN ou RED (mais recente primeiro) */
+export function computeHistoryStreak(list = []) {
+  if (!list.length) return { type: null, count: 0 };
+
+  const firstGreen = getHistorySummary(list[0]).isGreen;
+  let count = 0;
+
+  for (const signal of list) {
+    if (getHistorySummary(signal).isGreen === firstGreen) count++;
+    else break;
+  }
+
+  return { type: firstGreen ? 'green' : 'red', count };
+}
+
+export function filterHistoryList(list = [], filters = {}) {
+  const { result = 'all', gale = null, color = null } = filters;
+
+  return list.filter((signal) => {
+    const summary = getHistorySummary(signal);
+    const galeNum = Number(signal.current_gale) || 0;
+
+    if (result === 'green' && !summary.isGreen) return false;
+    if (result === 'red' && summary.isGreen) return false;
+
+    if (gale === 'g0' && galeNum !== 0) return false;
+    if (gale === 'gale' && galeNum === 0) return false;
+
+    if (color === 'player' && summary.betZone !== 'player') return false;
+    if (color === 'banker' && summary.betZone !== 'banker') return false;
+
+    return true;
+  });
 }

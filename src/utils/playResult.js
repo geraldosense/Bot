@@ -1,6 +1,6 @@
 /** Regras de gale — entrada inicial + gales após falha */
 
-export const MAX_GALES = 2;
+export const MAX_GALES = 3;
 export const GALE_ATTEMPTS = MAX_GALES + 1;
 export const ATTEMPT_LABELS = ['ENTRADA', '1° GALE', '2° GALE', '3° GALE'];
 export const GALE_ONLY_LABELS = ['1° GALE', '2° GALE', '3° GALE'];
@@ -22,12 +22,26 @@ export function classifyPlayResult(signal) {
   return null;
 }
 
+/** Outcome para SMS/popup — sempre dispara em resultado final GREEN ou RED */
+export function resolveAlertOutcome(signal) {
+  if (!signal?.id) return null;
+
+  const status = signal.signal_status || 'result';
+  if (status !== 'result') return null;
+
+  const result = String(signal.result || '').toLowerCase();
+  if (result === 'green') return 'green';
+  if (result === 'loss' || result === 'red') return 'loss';
+
+  return classifyPlayResult({ ...signal, signal_status: 'result' });
+}
+
 export function isDefinitiveLoss(signal) {
   return classifyPlayResult(signal) === 'loss';
 }
 
 export function isPlayGreen(signal) {
-  return classifyPlayResult(signal) === 'green';
+  return resolveAlertOutcome(signal) === 'green' || classifyPlayResult(signal) === 'green';
 }
 
 export function formatAttemptLabel(apiGale = 0) {

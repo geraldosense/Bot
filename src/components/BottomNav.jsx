@@ -60,6 +60,11 @@ function NavItem({ to, icon: Icon, label, active, accent = 'emerald', badge }) {
               <Crown className="w-2.5 h-2.5 text-black" strokeWidth={2.5} />
             </span>
           )}
+          {badge === 'manager' && (
+            <span className="absolute -top-2 -right-3 flex items-center justify-center w-4 h-4 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 shadow-[0_2px_8px_rgba(129,140,248,0.5)]">
+              <Shield className="w-2.5 h-2.5 text-white" strokeWidth={2.5} />
+            </span>
+          )}
         </div>
         <span
           className={`text-[10px] font-semibold tracking-wide transition-all duration-200 ${
@@ -80,7 +85,7 @@ function NavItem({ to, icon: Icon, label, active, accent = 'emerald', badge }) {
 
 export default function BottomNav() {
   const location = useLocation();
-  const { user, isVip, isAdmin, isSuperAdmin } = useAuth();
+  const { user, isVip, isAdmin, isOwner, isManager, isSuperAdmin } = useAuth();
 
   if (!user) return null;
 
@@ -97,12 +102,14 @@ export default function BottomNav() {
   ];
 
   if (isAdmin) {
+    const staffLabel = isOwner ? 'Proprietário' : isManager ? 'Gerente' : 'Admin';
+    const staffBadge = isOwner ? 'owner' : isManager ? 'manager' : null;
     tabs.push({
       path: '/Admin',
       icon: Shield,
-      label: isSuperAdmin ? 'Proprietário' : 'Admin',
+      label: staffLabel,
       accent: 'purple',
-      badge: isSuperAdmin ? 'owner' : null,
+      badge: staffBadge,
     });
   }
 

@@ -73,13 +73,17 @@ export function AuthProvider({ children }) {
 
   const refreshUser = () => token && fetchMe(token);
 
-  const isVip = ['vip', 'admin', 'super_admin'].includes(user?.role);
-  const isAdmin = ['admin', 'super_admin'].includes(user?.role);
-  const isSuperAdmin = user?.role === 'super_admin';
+  const isVip = ['vip', 'admin', 'manager', 'super_admin'].includes(user?.role);
+  const isAdmin = ['admin', 'manager', 'super_admin'].includes(user?.role);
+  const isOwner = user?.role === 'super_admin';
+  const isManager = user?.role === 'manager';
+  const isSuperAdmin = isOwner;
   const isMember = user?.role === 'member';
-  const canPromoteVip = isSuperAdmin;
-  const canRequestVip = isSuperAdmin || user?.permissions?.can_request_vip;
-  const canViewActive = isSuperAdmin || user?.permissions?.can_view_active_users;
+  const canManageAccounts = isOwner || isManager;
+  const canManageManagers = isOwner;
+  const canPromoteVip = canManageAccounts;
+  const canRequestVip = canManageAccounts || user?.permissions?.can_request_vip;
+  const canViewActive = canManageAccounts || user?.permissions?.can_view_active_users;
 
   return (
     <AuthContext.Provider
@@ -93,7 +97,11 @@ export function AuthProvider({ children }) {
         refreshUser,
         isVip,
         isAdmin,
+        isOwner,
+        isManager,
         isSuperAdmin,
+        canManageAccounts,
+        canManageManagers,
         isMember,
         canPromoteVip,
         canRequestVip,

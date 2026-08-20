@@ -23,12 +23,15 @@ import {
   approveVipRevocation,
   rejectVipRevocationRequest,
   demoteAdmin,
+  promoteToManager,
+  demoteManager,
   recordLogin,
   touchLastSeen,
   getAccountStats,
   getStorageMode,
   ROLES,
 } from './userStore.js';
+import { isManagerOrAbove } from './roleHierarchy.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'bac-bo-bot-secret-change-in-production';
 const JWT_EXPIRES = '7d';
@@ -82,6 +85,13 @@ export function requireVip(req, res, next) {
 export function requireAdmin(req, res, next) {
   if (!isAdminOrAbove(req.user)) {
     return res.status(403).json({ error: 'Acesso admin necessário' });
+  }
+  next();
+}
+
+export function requireManagerOrAbove(req, res, next) {
+  if (!isManagerOrAbove(req.user)) {
+    return res.status(403).json({ error: 'Acesso Proprietário ou Gerente necessário' });
   }
   next();
 }
@@ -181,7 +191,7 @@ function enrichUsersWithActivity(users, activeSessions, onlineMs = 5 * 60 * 1000
 }
 
 export function registerAdminRoutes(app, activeSessions) {
-  app.get('/api/admin/overview', authMiddleware, requireSuperAdmin, async (_, res) => {
+  app.get('/api/admin/overview', authMiddleware, requireManagerOrAbove, async (_, res) => {
     try {
       const allUsers = (await listUsers()).map(sanitizeUser);
       const users = enrichUsersWithActivity(allUsers, activeSessions);
@@ -204,7 +214,7 @@ export function registerAdminRoutes(app, activeSessions) {
     }
   });
 
-  app.get('/api/admin/users', authMiddleware, requireSuperAdmin, async (_, res) => {
+  app.get('/api/admin/users', authMiddleware, requireManagerOrAbove, async (_, res) => {
     try {
       const allUsers = (await listUsers()).map(sanitizeUser);
       res.json({ users: enrichUsersWithActivity(allUsers, activeSessions) });
@@ -213,7 +223,7 @@ export function registerAdminRoutes(app, activeSessions) {
     }
   });
 
-  app.post('/api/admin/users/:id/approve-vip', authMiddleware, requireSuperAdmin, async (req, res) => {
+  app.post('/api/admin/users/:id/approve-vip', authMiddleware, requireManagerOrAbove, async (req, res) => {
     try {
       const user = await approveVip(req.params.id, req.user.id);
       res.json({ user, message: 'VIP aprovado com sucesso' });
@@ -222,16 +232,16 @@ export function registerAdminRoutes(app, activeSessions) {
     }
   });
 
-  app.post('/api/admin/users/:id/revoke-vip', authMiddleware, requireSuperAdmin, async (req, res) => {
+  app.post('/api/admin/users/:id/revoke-vip', authMiddleware, requireManagerOrAbove, async (req, res) => {
     try {
-      const user = await revokeVip(req.params.id);
+      const user = await revokeVip(req.params.id, req.user);
       res.json({ user, message: 'VIP removido — utilizador voltou a membro normal' });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
   });
 
-  app.get('/api/admin/vip-requests', authMiddleware, requireSuperAdmin, async (_, res) => {
+  app.get('/api/admin/vip-requests', authMiddleware, requireManagerOrAbove, async (_, res) => {
     try {
       res.json({ requests: await listVipRequests() });
     } catch (err) {
@@ -248,7 +258,7 @@ export function registerAdminRoutes(app, activeSessions) {
         const user = await requestVipPromotion(req.params.id, req.user.id);
         res.json({
           user,
-          message: 'Pedido enviado ao Proprietário para aprovação VIP',
+          message: 'Pedido enviado ao Proprietário ou Gerente para aprovação VIP',
         });
       } catch (err) {
         res.status(400).json({ error: err.message });
@@ -256,7 +266,7 @@ export function registerAdminRoutes(app, activeSessions) {
     },
   );
 
-  app.post('/api/admin/users/:id/reject-vip-request', authMiddleware, requireSuperAdmin, async (req, res) => {
+  app.post('/api/admin/users/:id/reject-vip-request', authMiddleware, requireManagerOrAbove, async (req, res) => {
     try {
       const user = await rejectVipRequest(req.params.id);
       res.json({ user, message: 'Pedido VIP rejeitado' });
@@ -292,7 +302,7 @@ export function registerAdminRoutes(app, activeSessions) {
         const user = await requestVipRevocation(req.params.id, req.user.id, req.body?.reason);
         res.json({
           user,
-          message: 'Pedido de exoneração VIP enviado ao Proprietário',
+          message: 'Pedido de exoneração VIP enviado ao Proprietário ou Gerente',
         });
       } catch (err) {
         res.status(400).json({ error: err.message });
@@ -300,7 +310,7 @@ export function registerAdminRoutes(app, activeSessions) {
     },
   );
 
-  app.get('/api/admin/vip-revocation-requests', authMiddleware, requireSuperAdmin, async (_, res) => {
+  app.get('/api/admin/vip-revocation-requests', authMiddleware, requireManagerOrAbove, async (_, res) => {
     try {
       res.json({ requests: await listVipRevocationRequests() });
     } catch (err) {
@@ -311,7 +321,7 @@ export function registerAdminRoutes(app, activeSessions) {
   app.post(
     '/api/admin/users/:id/approve-vip-revocation',
     authMiddleware,
-    requireSuperAdmin,
+    requireManagerOrAbove,
     async (req, res) => {
       try {
         const user = await approveVipRevocation(req.params.id, req.user.id);
@@ -325,7 +335,7 @@ export function registerAdminRoutes(app, activeSessions) {
   app.post(
     '/api/admin/users/:id/reject-vip-revocation',
     authMiddleware,
-    requireSuperAdmin,
+    requireManagerOrAbove,
     async (req, res) => {
       try {
         const user = await rejectVipRevocationRequest(req.params.id);
@@ -345,13 +355,13 @@ export function registerAdminRoutes(app, activeSessions) {
     });
   });
 
-  app.post('/api/admin/promote-admin/:id', authMiddleware, requireSuperAdmin, async (req, res) => {
+  app.post('/api/admin/promote-admin/:id', authMiddleware, requireManagerOrAbove, async (req, res) => {
     try {
       const { can_view_active_users = true, can_request_vip = true } = req.body;
       const user = await promoteToAdmin(
         req.params.id,
         { can_view_active_users, can_request_vip },
-        req.user.id,
+        req.user,
       );
       res.json({ user, message: 'Promovido a Admin' });
     } catch (err) {
@@ -359,19 +369,37 @@ export function registerAdminRoutes(app, activeSessions) {
     }
   });
 
-  app.post('/api/admin/users/:id/demote-admin', authMiddleware, requireSuperAdmin, async (req, res) => {
+  app.post('/api/admin/users/:id/demote-admin', authMiddleware, requireManagerOrAbove, async (req, res) => {
     try {
-      const user = await demoteAdmin(req.params.id);
+      const user = await demoteAdmin(req.params.id, req.user);
       res.json({ user, message: 'Administrador removido — voltou a membro VIP' });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
   });
 
-  app.patch('/api/admin/permissions/:id', authMiddleware, requireSuperAdmin, async (req, res) => {
+  app.patch('/api/admin/permissions/:id', authMiddleware, requireManagerOrAbove, async (req, res) => {
     try {
-      const user = await updateAdminPermissions(req.params.id, req.body);
+      const user = await updateAdminPermissions(req.params.id, req.body, req.user);
       res.json({ user, message: 'Permissões atualizadas' });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/admin/promote-manager/:id', authMiddleware, requireSuperAdmin, async (req, res) => {
+    try {
+      const user = await promoteToManager(req.params.id, req.user.id);
+      res.json({ user, message: 'Promovido a Gerente — superior aos admins' });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/admin/users/:id/demote-manager', authMiddleware, requireSuperAdmin, async (req, res) => {
+    try {
+      const user = await demoteManager(req.params.id, req.user);
+      res.json({ user, message: 'Gerente rebaixado — voltou a membro VIP' });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

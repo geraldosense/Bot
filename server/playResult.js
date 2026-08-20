@@ -33,7 +33,25 @@ export function isDefinitiveLoss(signal) {
 }
 
 export function isPlayGreen(signal) {
-  return classifyPlayResult(signal) === 'green';
+  return resolveAlertOutcome(signal) === 'green' || classifyPlayResult(signal) === 'green';
+}
+
+/** Outcome para SMS/popup — sempre dispara em resultado final GREEN ou RED */
+export function resolveAlertOutcome(signal) {
+  if (!signal?.id) return null;
+
+  const reconciled = reconcileSignalResult({
+    ...signal,
+    signal_status: signal.signal_status || 'result',
+  });
+
+  if (reconciled.signal_status !== 'result') return null;
+
+  const result = String(reconciled.result || '').toLowerCase();
+  if (result === 'green') return 'green';
+  if (result === 'loss' || result === 'red') return 'loss';
+
+  return classifyPlayResult(reconciled);
 }
 
 export function formatAttemptLabel(apiGale = 0) {
@@ -82,9 +100,9 @@ export function buildPlayResultAlert(signal, outcome) {
   if (outcome === 'green') {
     return {
       outcome: 'green',
-      title: 'ACERTOU',
-      message: `Acertou ${prep} ${attemptLabel}`,
-      sub: colorLabel ? `Cor acertada: ${colorLabel}` : null,
+      title: 'ACERTOU ✓',
+      message: `Entrada confirmada — acertou ${prep} ${attemptLabel}`,
+      sub: colorLabel ? `Cor acertada: ${colorLabel}` : 'Resultado GREEN confirmado',
       colorLabel,
       galeLabel: attemptLabel,
     };
@@ -92,9 +110,9 @@ export function buildPlayResultAlert(signal, outcome) {
 
   return {
     outcome: 'loss',
-    title: 'PERDEU',
-    message: `Perdeu ${prep} ${attemptLabel} — entrada e 3 gales esgotados`,
-    sub: colorLabel ? `Entrada: ${colorLabel}` : 'Todos os gales esgotados',
+    title: 'PERDEU ✗',
+    message: `Entrada perdida — RED ${prep} ${attemptLabel}`,
+    sub: colorLabel ? `Apostou: ${colorLabel}` : 'Resultado RED confirmado',
     colorLabel,
     galeLabel: attemptLabel,
   };

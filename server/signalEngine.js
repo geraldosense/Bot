@@ -1,6 +1,6 @@
 import { shouldShowMonitoring } from './casinoDataProvider.js';
 import { scoreboardStore } from './scoreboardStore.js';
-import { classifyPlayResult, buildPlayResultAlert, MAX_GALES } from './playResult.js';
+import { classifyPlayResult, buildPlayResultAlert, resolveAlertOutcome, MAX_GALES } from './playResult.js';
 import { mergeSignalRecords, resolveSignalBet, reconcileSignalResult } from './signalBet.js';
 
 const MAX_HISTORY = 200;
@@ -240,7 +240,7 @@ export class SignalEngine {
         this.emitHistory();
 
         if (prevStatus !== 'result') {
-          const outcome = classifyPlayResult(this.currentSignal);
+          const outcome = resolveAlertOutcome(this.currentSignal);
           if (outcome) {
             this.emit('play_result', {
               outcome,

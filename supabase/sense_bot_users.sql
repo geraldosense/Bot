@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS public.sense_bot_users (
   email TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,
   password_hash TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'member',
+  role TEXT NOT NULL DEFAULT 'member', -- member | vip | admin | manager | super_admin
   permissions JSONB NOT NULL DEFAULT '{"can_request_vip":false,"can_view_active_users":false,"can_manage_admins":false}'::jsonb,
   vip_approved_at TIMESTAMPTZ,
   vip_approved_by TEXT,

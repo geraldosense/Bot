@@ -1,9 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Wifi, WifiOff } from 'lucide-react';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { useResultAlerts } from '../hooks/useResultAlerts';
 import HistoryGrid from '../components/HistoryGrid';
 import SignalHistory from '../components/SignalHistory';
+import SignalResultAlert from '../components/SignalResultAlert';
 import BottomNav from '../components/BottomNav';
 import SenseBotLogo from '../components/SenseBotLogo';
 import GameCard from '../components/GameCard';
@@ -65,11 +67,24 @@ const PLACEHOLDER_SCORE = normalizeScoreboard();
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { connected, snapshot } = useWebSocket();
+  const { alert, dismiss, handlePlayResult, handleHistory, handleSnapshot } = useResultAlerts();
+  const { connected, snapshot, refreshHistory } = useWebSocket({
+    onPlayResult: handlePlayResult,
+    onHistory: handleHistory,
+    onSnapshot: handleSnapshot,
+  });
   const { user, isVip } = useAuth();
   const [selectedGame, setSelectedGame] = React.useState(GAMES[0]);
   const [category, setCategory] = React.useState('all');
   const [tab, setTab] = React.useState('sinais');
+
+  useEffect(() => {
+    if (!connected || !isVip) return undefined;
+    if (tab !== 'sinais' && tab !== 'historico') return undefined;
+    refreshHistory();
+    const timer = setInterval(refreshHistory, 15000);
+    return () => clearInterval(timer);
+  }, [connected, isVip, tab, refreshHistory]);
 
   const handleGameSelect = (game) => {
     if (game.disabled) return;
@@ -86,7 +101,7 @@ export default function Dashboard() {
     [isLiveGame, isVip, snapshot.scoreboard],
   );
 
-  const maxGales = snapshot.rawSignal?.gales ?? snapshot.signal?.gales ?? 2;
+  const maxGales = snapshot.rawSignal?.gales ?? snapshot.signal?.gales ?? 3;
 
   const filteredGames = GAMES.filter(
     (g) => category === 'all' || g.category === category,
@@ -94,6 +109,8 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-zinc-950 pb-28">
+      <SignalResultAlert alert={alert} onDismiss={dismiss} />
+
       {/* Header */}
       <div
         className="relative overflow-hidden py-5 px-4 shadow-xl border-b border-purple-500/20"

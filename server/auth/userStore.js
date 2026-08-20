@@ -12,17 +12,23 @@ import {
   sbUpdateUser,
   sbUpsertUsers,
 } from './supabaseClient.js';
+import {
+  ROLES,
+  MANAGER_PERMISSIONS,
+  isSuperAdmin,
+  isManager,
+  isManagerOrAbove,
+  isAdminOrAbove,
+  isVipOrAbove,
+  hasPermission,
+  assertActorCanModifyTarget,
+} from './roleHierarchy.js';
+
+export { ROLES, isAdminOrAbove, isVipOrAbove, hasPermission } from './roleHierarchy.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, '../data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
-
-export const ROLES = {
-  SUPER_ADMIN: 'super_admin',
-  ADMIN: 'admin',
-  VIP: 'vip',
-  MEMBER: 'member',
-};
 
 const DEFAULT_PERMISSIONS = {
   can_request_vip: false,
@@ -264,6 +270,7 @@ export async function getAccountStats() {
     members: registered.filter((u) => u.role === ROLES.MEMBER).length,
     vip: registered.filter((u) => u.role === ROLES.VIP).length,
     admins: registered.filter((u) => u.role === ROLES.ADMIN).length,
+    managers: registered.filter((u) => u.role === ROLES.MANAGER).length,
     vipRequests: registered.filter((u) => u.vipRequest?.status === 'pending').length,
     vipRevocationRequests: registered.filter((u) => u.vipRevocationRequest?.status === 'pending')
       .length,
@@ -285,11 +292,15 @@ export async function approveVip(userId, adminId) {
   return sanitizeUser(user);
 }
 
-export async function revokeVip(userId) {
+export async function revokeVip(userId, actor = null) {
   const user = await findById(userId);
   if (!user) throw new Error('Utilizador não encontrado');
+  if (actor) assertActorCanModifyTarget(actor, user);
   if (user.role === ROLES.SUPER_ADMIN) {
-    throw new Error('Não é possível revogar o Proprietário');
+    throw new Error('O Proprietário é intocável e nunca pode ser exonerado');
+  }
+  if (user.role === ROLES.MANAGER) {
+    throw new Error('Gerentes só podem ser rebaixados pelo Proprietário');
   }
   if (user.role !== ROLES.VIP) {
     throw new Error('Só contas VIP podem ser removidas da área VIP');
@@ -305,9 +316,48 @@ export async function revokeVip(userId) {
   return sanitizeUser(updated);
 }
 
-export async function promoteToAdmin(userId, permissions, superAdminId) {
+export async function promoteToManager(userId, ownerId) {
   const user = await findById(userId);
   if (!user) throw new Error('Utilizador não encontrado');
+  if (user.role !== ROLES.VIP) {
+    throw new Error('Só membros VIP podem ser promovidos a Gerente');
+  }
+
+  const updated = await updateUserRecord(userId, {
+    role: ROLES.MANAGER,
+    permissions: { ...MANAGER_PERMISSIONS },
+    vipApprovedAt: user.vipApprovedAt || new Date().toISOString(),
+    vipApprovedBy: user.vipApprovedBy || ownerId,
+  });
+  return sanitizeUser(updated);
+}
+
+export async function demoteManager(userId, actor) {
+  const user = await findById(userId);
+  if (!user) throw new Error('Utilizador não encontrado');
+  if (!isSuperAdmin(actor)) {
+    throw new Error('Só o Proprietário pode rebaixar um Gerente');
+  }
+  if (user.role !== ROLES.MANAGER) {
+    throw new Error('Utilizador não é Gerente');
+  }
+
+  const updated = await updateUserRecord(userId, {
+    role: ROLES.VIP,
+    permissions: { ...DEFAULT_PERMISSIONS },
+  });
+  return sanitizeUser(updated);
+}
+
+export async function promoteToAdmin(userId, permissions, actor) {
+  const user = await findById(userId);
+  if (!user) throw new Error('Utilizador não encontrado');
+  if (!isManagerOrAbove(actor)) {
+    throw new Error('Só Proprietário ou Gerente podem promover administradores');
+  }
+  if (user.role !== ROLES.VIP) {
+    throw new Error('Só membros VIP podem ser promovidos a Admin');
+  }
 
   const updated = await updateUserRecord(userId, {
     role: ROLES.ADMIN,
@@ -318,14 +368,17 @@ export async function promoteToAdmin(userId, permissions, superAdminId) {
       can_manage_admins: false,
     },
     vipApprovedAt: user.vipApprovedAt || new Date().toISOString(),
-    vipApprovedBy: user.vipApprovedBy || superAdminId,
+    vipApprovedBy: user.vipApprovedBy || actor.id,
   });
   return sanitizeUser(updated);
 }
 
-export async function updateAdminPermissions(userId, permissions) {
+export async function updateAdminPermissions(userId, permissions, actor) {
   const user = await findById(userId);
   if (!user) throw new Error('Utilizador não encontrado');
+  if (!isManagerOrAbove(actor)) {
+    throw new Error('Só Proprietário ou Gerente podem alterar permissões de admin');
+  }
   if (user.role !== ROLES.ADMIN) throw new Error('Utilizador não é admin');
 
   const updated = await updateUserRecord(userId, {
@@ -444,32 +497,18 @@ export async function approveVipRevocation(userId, ownerId) {
   return sanitizeUser(updated);
 }
 
-export async function demoteAdmin(userId) {
+export async function demoteAdmin(userId, actor) {
   const user = await findById(userId);
   if (!user) throw new Error('Utilizador não encontrado');
-  if (user.role !== ROLES.ADMIN) throw new Error('Utilizador não é administrador');
-  if (user.role === ROLES.SUPER_ADMIN) {
-    throw new Error('Não é possível remover o Proprietário');
+  if (!isManagerOrAbove(actor)) {
+    throw new Error('Só Proprietário ou Gerente podem remover administradores');
   }
+  if (user.role !== ROLES.ADMIN) throw new Error('Utilizador não é administrador');
+  assertActorCanModifyTarget(actor, user);
 
   const updated = await updateUserRecord(userId, {
     role: ROLES.VIP,
     permissions: { ...DEFAULT_PERMISSIONS },
   });
   return sanitizeUser(updated);
-}
-
-export function hasPermission(user, permission) {
-  if (!user) return false;
-  if (user.role === ROLES.SUPER_ADMIN) return true;
-  if (user.role === ROLES.ADMIN) return !!user.permissions?.[permission];
-  return false;
-}
-
-export function isVipOrAbove(user) {
-  return [ROLES.VIP, ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(user?.role);
-}
-
-export function isAdminOrAbove(user) {
-  return [ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(user?.role);
 }

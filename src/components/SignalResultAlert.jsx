@@ -74,11 +74,20 @@ export default function SignalResultAlert({ alert, onDismiss }) {
                   {alert.title}
                 </p>
                 <p className="text-white font-semibold text-sm mt-0.5">{alert.message}</p>
-                {colorLine && (
-                  <p className="text-white/80 text-xs mt-1.5 font-semibold">{colorLine}</p>
+                {(colorLine || alert.sub) && (
+                  <p className="text-white/80 text-xs mt-1.5 font-semibold">
+                    {colorLine || alert.sub}
+                  </p>
                 )}
-                {!colorLine && alert.sub && (
-                  <p className="text-white/60 text-xs mt-1.5">{alert.sub}</p>
+                {isGreen && (
+                  <p className="text-emerald-400/70 text-[10px] mt-1 font-bold uppercase tracking-wide">
+                    ✓ Entrada confirmada pela mesa
+                  </p>
+                )}
+                {!isGreen && (
+                  <p className="text-red-400/70 text-[10px] mt-1 font-bold uppercase tracking-wide">
+                    ✗ Resultado RED registado
+                  </p>
                 )}
               </div>
             </div>
