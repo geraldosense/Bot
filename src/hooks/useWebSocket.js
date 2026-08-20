@@ -212,7 +212,25 @@ export function useWebSocket(options = {}) {
 
   const forceAnalyze = useCallback(() => send({ type: 'force_analyze' }), [send]);
 
-  return { connected, snapshot, lastRound, lastSignal, forceAnalyze };
+  const refreshHistory = useCallback(async () => {
+    if (!token || !isVip) return;
+    try {
+      const res = await fetch('/api/signals', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      patchSnapshot({
+        history: data.history || [],
+        scoreboard: applyScoreboard(data.scoreboard),
+        monitoring: data.monitoring ?? undefined,
+      });
+    } catch {
+      /* ignore */
+    }
+  }, [token, isVip, patchSnapshot, applyScoreboard]);
+
+  return { connected, snapshot, lastRound, lastSignal, forceAnalyze, refreshHistory };
 }
 
 export function formatTime(dateStr) {

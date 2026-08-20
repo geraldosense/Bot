@@ -1,12 +1,18 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, XCircle, X } from 'lucide-react';
-import { getSignalBetColor } from '../utils/signalResult';
+import { getAlertDisplayColor, reconcileHistorySignal } from '../utils/signalResult';
 
 export default function SignalResultAlert({ alert, onDismiss }) {
   if (!alert) return null;
 
   const isGreen = alert.outcome === 'green';
-  const bet = getSignalBetColor(alert.signal);
+  const signal = reconcileHistorySignal(alert.signal);
+  const color = getAlertDisplayColor(signal, alert.outcome);
+  const colorLine = color
+    ? isGreen
+      ? `Cor acertada: ${color.emoji} ${color.label}`
+      : `${color.emoji} ${color.label}`
+    : null;
 
   return (
     <AnimatePresence>
@@ -68,13 +74,10 @@ export default function SignalResultAlert({ alert, onDismiss }) {
                   {alert.title}
                 </p>
                 <p className="text-white font-semibold text-sm mt-0.5">{alert.message}</p>
-                {bet && (
-                  <p className="text-white/70 text-xs mt-1.5">
-                    {bet.emoji} {bet.label}
-                    {alert.sub ? ` · ${alert.sub}` : ''}
-                  </p>
+                {colorLine && (
+                  <p className="text-white/80 text-xs mt-1.5 font-semibold">{colorLine}</p>
                 )}
-                {!bet && alert.sub && (
+                {!colorLine && alert.sub && (
                   <p className="text-white/60 text-xs mt-1.5">{alert.sub}</p>
                 )}
               </div>

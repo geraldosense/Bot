@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useSignalAlerts } from '../hooks/useSignalAlerts';
 import BacBoAIPanel from '../components/BacBoAIPanel';
@@ -21,10 +21,17 @@ export default function BacBo() {
     [seedSeen],
   );
 
-  const { connected, snapshot } = useWebSocket({
+  const { connected, snapshot, refreshHistory } = useWebSocket({
     onPlayResult: showAlert,
     onSnapshot: handleSnapshot,
   });
+
+  useEffect(() => {
+    if (!connected) return;
+    refreshHistory();
+    const timer = setInterval(refreshHistory, 15000);
+    return () => clearInterval(timer);
+  }, [connected, refreshHistory]);
 
   const showMonitoring = snapshot.monitoring ?? !snapshot.signal;
   const activeSignal = showMonitoring ? null : snapshot.signal;
@@ -48,7 +55,17 @@ export default function BacBo() {
           wsConnected={connected}
         />
 
-        <SignalHistory history={snapshot.history} limit={12} />
+        <SignalHistory
+          history={snapshot.history}
+          scoreboard={snapshot.scoreboard}
+          variant="robot"
+          title="Histórico de Entradas"
+          limit={200}
+          defaultExpanded
+          showVerMais={false}
+          maxHeight={520}
+          live={connected && snapshot.casinoConnected}
+        />
       </div>
       <BottomNav />
     </div>

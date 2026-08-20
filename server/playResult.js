@@ -1,5 +1,7 @@
 /** Regras: entrada inicial + gales só após falha (API current_gale 0 = entrada) */
 
+import { resolveSignalBet, reconcileSignalResult, parseOutcomeZone } from './signalBet.js';
+
 export const MAX_GALES = 3;
 export const GALE_ATTEMPTS = MAX_GALES + 1;
 export const ATTEMPT_LABELS = ['ENTRADA', '1° GALE', '2° GALE', '3° GALE'];
@@ -43,11 +45,38 @@ export function formatGaleLabel(apiGale = 0) {
   return formatAttemptLabel(apiGale);
 }
 
+const BET_LABELS = { Player: 'AZUL', Banker: 'VERMELHO', Tie: 'EMPATE' };
+
+function zoneToBetLabel(zone) {
+  if (zone === 'player') return 'AZUL';
+  if (zone === 'banker') return 'VERMELHO';
+  if (zone === 'tie') return 'EMPATE';
+  return null;
+}
+
+/** Cor real para alerta — acerto usa cor que saiu na mesa (= aposta) */
+function resolveAlertColorLabel(signal, outcome) {
+  const reconciled = reconcileSignalResult({ ...signal, signal_status: 'result' });
+
+  if (outcome === 'green') {
+    const outcomeZone =
+      parseOutcomeZone(reconciled.result_value) || parseOutcomeZone(reconciled.actual_outcome);
+    if (outcomeZone) return zoneToBetLabel(outcomeZone);
+  }
+
+  const bet = resolveSignalBet(reconciled);
+  if (bet) return BET_LABELS[bet] || bet;
+
+  const outcomeZone =
+    parseOutcomeZone(reconciled.result_value) || parseOutcomeZone(reconciled.actual_outcome);
+  return zoneToBetLabel(outcomeZone);
+}
+
 export function buildPlayResultAlert(signal, outcome) {
   if (!signal || !outcome) return null;
 
   const attemptLabel = formatAttemptLabel(signal.current_gale);
-  const bet = String(signal.bet_recommendation || signal.bet || signal.entry_bet || '').toUpperCase();
+  const colorLabel = resolveAlertColorLabel(signal, outcome);
   const prep = attemptLabel === 'ENTRADA' ? 'na' : 'no';
 
   if (outcome === 'green') {
@@ -55,7 +84,8 @@ export function buildPlayResultAlert(signal, outcome) {
       outcome: 'green',
       title: 'ACERTOU',
       message: `Acertou ${prep} ${attemptLabel}`,
-      sub: bet ? `Cor: ${bet}` : null,
+      sub: colorLabel ? `Cor acertada: ${colorLabel}` : null,
+      colorLabel,
       galeLabel: attemptLabel,
     };
   }
@@ -64,7 +94,8 @@ export function buildPlayResultAlert(signal, outcome) {
     outcome: 'loss',
     title: 'PERDEU',
     message: `Perdeu ${prep} ${attemptLabel} — entrada e 3 gales esgotados`,
-    sub: bet ? `Entrada: ${bet}` : 'Todos os gales esgotados',
+    sub: colorLabel ? `Entrada: ${colorLabel}` : 'Todos os gales esgotados',
+    colorLabel,
     galeLabel: attemptLabel,
   };
 }

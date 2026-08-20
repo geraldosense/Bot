@@ -199,7 +199,13 @@ export default function Dashboard() {
 
         {tab === 'sinais' && isLiveGame && isVip && (
           <div className="space-y-4">
-            <SignalHistory history={snapshot.history} />
+            <SignalHistory
+              history={snapshot.history}
+              scoreboard={snapshot.scoreboard}
+              variant="robot"
+              limit={12}
+              live={connected && snapshot.casinoConnected}
+            />
 
             <Link
               to="/BacBo"
@@ -244,7 +250,17 @@ export default function Dashboard() {
 
         {tab === 'historico' && isLiveGame && isVip && (
           <div className="space-y-4">
-            <SignalHistory history={snapshot.history} title="HISTÓRICO COMPLETO" limit={50} />
+            <SignalHistory
+              history={snapshot.history}
+              scoreboard={snapshot.scoreboard}
+              variant="robot"
+              title="HISTÓRICO COMPLETO"
+              limit={200}
+              defaultExpanded
+              showVerMais={false}
+              maxHeight={640}
+              live={connected && snapshot.casinoConnected}
+            />
             <Link
               to="/BacBo"
               className="block w-full text-center py-3.5 rounded-xl text-white font-bold text-sm hover:opacity-90 transition-opacity"

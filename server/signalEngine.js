@@ -1,9 +1,9 @@
 import { shouldShowMonitoring } from './casinoDataProvider.js';
 import { scoreboardStore } from './scoreboardStore.js';
 import { classifyPlayResult, buildPlayResultAlert, MAX_GALES } from './playResult.js';
-import { mergeSignalRecords, resolveSignalBet, historyFingerprint, reconcileSignalResult } from './signalBet.js';
+import { mergeSignalRecords, resolveSignalBet, reconcileSignalResult } from './signalBet.js';
 
-const MAX_HISTORY = 100;
+const MAX_HISTORY = 200;
 
 /**
  * Motor de sinais — dados reais Evolution Bac Bo.
@@ -120,17 +120,8 @@ export class SignalEngine {
       (a, b) => new Date(b.created_date) - new Date(a.created_date),
     );
 
-    const seenFp = new Set();
-    const unique = [];
-    for (const item of sorted) {
-      const fp = historyFingerprint(item);
-      if (seenFp.has(fp)) continue;
-      seenFp.add(fp);
-      unique.push(item);
-    }
-
     const prevKey = this.signalHistory.map((s) => String(s.id)).join('|');
-    this.signalHistory = unique.slice(0, MAX_HISTORY);
+    this.signalHistory = sorted.slice(0, MAX_HISTORY);
     const nextKey = this.signalHistory.map((s) => String(s.id)).join('|');
 
     if (prevKey !== nextKey) {
@@ -167,19 +158,9 @@ export class SignalEngine {
       byId.set(id, mergeSignalRecords(byId.get(id), item));
     }
 
-    const seenFp = new Set();
-    const unique = [];
-
-    for (const item of [...byId.values()].sort(
-      (a, b) => new Date(b.created_date) - new Date(a.created_date),
-    )) {
-      const fp = historyFingerprint(item);
-      if (seenFp.has(fp)) continue;
-      seenFp.add(fp);
-      unique.push(item);
-    }
-
-    this.signalHistory = unique.slice(0, MAX_HISTORY);
+    this.signalHistory = [...byId.values()]
+      .sort((a, b) => new Date(b.created_date) - new Date(a.created_date))
+      .slice(0, MAX_HISTORY);
   }
 
   upsertHistorySignal(raw) {

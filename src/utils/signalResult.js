@@ -12,13 +12,18 @@ export function isSignalGreen(signal) {
 
 /** Garante green/loss coerente com aposta vs resultado real da mesa */
 export function reconcileHistorySignal(signal) {
-  if (!signal || signal.signal_status !== 'result') return signal;
+  if (!signal) return signal;
 
-  const betZone = getSignalBetColor(signal)?.zone;
-  const outcomeZone = getSignalOutcomeColor(signal)?.zone;
+  const isResult =
+    signal.signal_status === 'result' ||
+    ['green', 'loss', 'red'].includes(String(signal.result || '').toLowerCase());
+  if (!isResult) return signal;
+
+  const betZone = parseBetZoneStrict(signal);
+  const outcomeZone = parseOutcomeZoneStrict(signal);
   let result = String(signal.result || '').toLowerCase();
 
-  if (result !== 'green' && result !== 'loss') {
+  if (result !== 'green' && result !== 'loss' && result !== 'red') {
     const rv = String(signal.result_value || '').toLowerCase();
     if (rv.includes('green') || rv.includes('acert') || rv.includes('win')) result = 'green';
     else if (rv.includes('loss') || rv.includes('red') || rv.includes('perd')) result = 'loss';
@@ -31,7 +36,27 @@ export function reconcileHistorySignal(signal) {
 
   if (!result) result = 'loss';
 
-  return { ...signal, result };
+  return {
+    ...signal,
+    signal_status: 'result',
+    result: result === 'green' ? 'green' : 'loss',
+  };
+}
+
+function parseBetZoneStrict(signal) {
+  for (const value of [signal?.entry_bet, signal?.bet, signal?.bet_recommendation, signal?.bet_safe]) {
+    const zone = matchZoneFromText(value) || betToZone(value);
+    if (zone) return zone;
+  }
+  return null;
+}
+
+function parseOutcomeZoneStrict(signal) {
+  for (const value of [signal?.result_value, signal?.actual_outcome]) {
+    const zone = matchZoneFromText(value);
+    if (zone) return zone;
+  }
+  return null;
 }
 
 export function getResultLabel(signal) {
@@ -92,11 +117,25 @@ function collectBetCandidates(signal) {
     signal?.bet_safe,
     signal?.analysis?.bet,
     signal?.analysis?.betRecommendation,
-    signal?.raw_message,
   ].filter(Boolean);
 }
 
 export function getSignalBetColor(signal) {
+  for (const value of [signal?.entry_bet, signal?.bet, signal?.bet_recommendation, signal?.bet_safe]) {
+    const zone = matchZoneFromText(value) || betToZone(value);
+    if (!zone) continue;
+    const config = getColorConfig(zone);
+    if (config) {
+      return {
+        zone,
+        label: config.bet,
+        casinoLabel: config.casinoLabel,
+        emoji: config.emoji,
+        hex: config.hex,
+      };
+    }
+  }
+
   for (const value of collectBetCandidates(signal)) {
     const zone = matchZoneFromText(value) || betToZone(value);
     if (!zone) continue;
@@ -127,12 +166,7 @@ export function getSignalBetColor(signal) {
 }
 
 export function getSignalOutcomeColor(signal) {
-  const candidates = [
-    signal?.result_value,
-    signal?.actual_outcome,
-    signal?.sequence?.split(/\s+/).pop(),
-    signal?.entry_condition,
-  ];
+  const candidates = [signal?.result_value, signal?.actual_outcome];
 
   for (const value of candidates) {
     const zone = matchZoneFromText(value);
@@ -162,10 +196,25 @@ export function getGaleResultLine(signal) {
 }
 
 export function getResultHighlightColor(signal) {
-  if (isSignalGreen(signal)) {
-    return getSignalBetColor(signal);
+  const normalized = reconcileHistorySignal(signal);
+  if (isSignalGreen(normalized)) {
+    return getSignalOutcomeColor(normalized) || getSignalBetColor(normalized);
   }
-  return getSignalOutcomeColor(signal);
+  return getSignalOutcomeColor(normalized);
+}
+
+/** Cor correcta para alertas SMS — acerto = cor que saiu na mesa (= aposta) */
+export function getAlertDisplayColor(signal, outcome) {
+  const normalized = reconcileHistorySignal({
+    ...signal,
+    signal_status: signal?.signal_status || 'result',
+  });
+
+  if (outcome === 'green' || isSignalGreen(normalized)) {
+    return getSignalOutcomeColor(normalized) || getSignalBetColor(normalized);
+  }
+
+  return getSignalBetColor(normalized) || getSignalOutcomeColor(normalized);
 }
 
 export function getResultColorCaption(signal) {
@@ -199,17 +248,20 @@ export function parseSequenceZones(signal, max = 3) {
   return all.slice(-max);
 }
 
-/** Seq — padrão do casino antes / durante análise (últimas 3 cores reais) */
+/** Seq — últimas 3 cores da mesa ANTES da entrada (MoneyTix) */
 export function getTriggerSequence(signal, max = 3) {
   const all = parseAllSequenceZones(signal);
   const attempts = Math.min(4, (Number(signal?.current_gale) || 0) + 1);
 
   if (all.length > attempts) {
-    return all.slice(-(attempts + max), -attempts).slice(-max);
+    const beforePlay = all.slice(0, -attempts);
+    return beforePlay.slice(-max);
   }
 
   const fromCondition = parseSequenceZones({ sequence: signal?.entry_condition }, max);
   if (fromCondition.length) return fromCondition;
+
+  if (all.length <= max) return all;
 
   return all.slice(0, max);
 }

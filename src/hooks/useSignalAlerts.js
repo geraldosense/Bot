@@ -1,24 +1,31 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { classifyPlayResult } from '../utils/playResult';
-import { getGaleResultLine } from '../utils/signalResult';
+import { getGaleResultLine, getAlertDisplayColor, reconcileHistorySignal } from '../utils/signalResult';
 import { playWinAlertSound, playLossAlertSound, vibrateForOutcome, unlockAlertSound } from '../utils/signalAlertSound';
 
 const ALERT_TTL_MS = 6000;
 
 function buildAlertFromSignal(signal) {
-  const outcome = classifyPlayResult(signal);
+  const normalized = reconcileHistorySignal({ ...signal, signal_status: 'result' });
+  const outcome = classifyPlayResult(normalized);
   if (!outcome) return null;
 
   const isGreen = outcome === 'green';
+  const color = getAlertDisplayColor(normalized, outcome);
+
   return {
-    id: `${signal.id}-${outcome}`,
+    id: `${normalized.id}-${outcome}`,
     outcome,
     title: isGreen ? 'ACERTOU' : 'PERDEU',
-    message: getGaleResultLine(signal),
-    sub: isGreen
-      ? 'Entrada confirmada pela IA'
-      : 'Errou na entrada e nos 3 gales',
-    signal,
+    message: getGaleResultLine(normalized),
+    sub: color
+      ? isGreen
+        ? `Cor acertada: ${color.label}`
+        : `Entrada: ${color.label}`
+      : isGreen
+        ? 'Entrada confirmada pela IA'
+        : 'Errou na entrada e nos 3 gales',
+    signal: normalized,
     at: Date.now(),
   };
 }
@@ -54,7 +61,10 @@ export function useSignalAlerts({ enabled = true } = {}) {
             title: payload.alert.title,
             message: payload.alert.message,
             sub: payload.alert.sub,
-            signal: payload.signal,
+            signal: reconcileHistorySignal({
+              ...payload.signal,
+              signal_status: 'result',
+            }),
             at: Date.now(),
           }
         : buildAlertFromSignal(payload.signal);
