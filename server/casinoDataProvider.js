@@ -3,6 +3,11 @@ import { dayStartIso } from './dayKey.js';
 import { calcWinRate } from './playResult.js';
 import { resolveSignalBet, reconcileSignalResult } from './signalBet.js';
 import { CASINO_SUPABASE_URL, casinoHeaders } from './casinoSupabase.js';
+import {
+  isPartialScoreboardSignal,
+  isRobotHistorySignal,
+  filterRobotHistorySignals,
+} from './historyUtils.js';
 
 const GAME_ID = process.env.BACBO_GAME_ID || 'bac_bo';
 
@@ -64,25 +69,37 @@ export async function fetchCasinoScoreboard(gameId = GAME_ID) {
   }
 }
 
-/** Resultados do dia — histórico real de cada jogada */
+/** Resultados do dia — cada entrada finalizada pelo robô */
 export async function fetchTodayResultSignals(gameId = GAME_ID) {
+  const bundle = await fetchTodayHistoryBundle(gameId);
+  return bundle.results;
+}
+
+/** Todos os sinais do dia (results + confirmed) para backfill de sequence */
+export async function fetchTodayHistoryBundle(gameId = GAME_ID) {
   try {
     const iso = dayStartIso();
 
     const url =
       `${CASINO_SUPABASE_URL}/rest/v1/sinais?jogo=eq.${gameId}` +
-      `&signal_status=eq.result&criado_em=gte.${encodeURIComponent(iso)}` +
-      `&order=criado_em.desc&limit=500` +
-      `&select=id,signal_status,result,result_value,bet_recommendation,bet_safe,bet,entry_bet,current_gale,gales,criado_em,sequence,entry_condition,raw_text`;
+      `&criado_em=gte.${encodeURIComponent(iso)}` +
+      `&order=criado_em.desc&limit=800` +
+      `&select=id,signal_status,result,result_value,bet_recommendation,bet_safe,bet,entry_bet,current_gale,gales,tie_protection,criado_em,sequence,entry_condition,raw_text,scoreboard_green,scoreboard_red,win_rate`;
 
     const res = await fetch(url, { headers: casinoHeaders(), signal: AbortSignal.timeout(12000) });
-    if (!res.ok) return [];
+    if (!res.ok) return { results: [], context: [] };
 
     const data = await res.json();
-    return (data || []).map(mapCasinoSignal).filter(Boolean);
+    const context = (data || []).map(mapCasinoSignal).filter(Boolean);
+    const rawResults = context.filter(
+      (s) => s.signal_status === 'result' || s.signal_status === 'green' || isRobotHistorySignal(s),
+    );
+    const results = filterRobotHistorySignals(rawResults, context);
+
+    return { results, context };
   } catch (err) {
     console.error('[casino] Erro ao buscar histórico do dia:', err.message);
-    return [];
+    return { results: [], context: [] };
   }
 }
 
@@ -133,9 +150,15 @@ export function mapCasinoSignal(row) {
     String(row.tie_protection).toLowerCase() === 'true';
 
   const signalStatus =
-    row.signal_status === 'result' ? 'result' : row.signal_status || 'analyzing';
+    row.signal_status === 'result' || row.signal_status === 'green'
+      ? 'result'
+      : row.signal_status || 'analyzing';
 
   const isAnalyzing = signalStatus === 'analyzing';
+
+  if (isPartialScoreboardSignal({ raw_message: row.raw_text })) {
+    return null;
+  }
 
   const mapped = reconcileSignalResult({
     id: row.id,
@@ -152,7 +175,7 @@ export function mapCasinoSignal(row) {
     tie_protection: tieProtection,
     gales: Number(row.gales) || 3,
     current_gale: Number(row.current_gale) || 0,
-    result: parseResultFlag(row),
+    result: parseResultFlag(row) || (row.signal_status === 'green' ? 'green' : null),
     result_value: row.result_value,
     actual_outcome: row.result_value || null,
     scoreboard_green: Number(row.scoreboard_green) || 0,
@@ -228,12 +251,14 @@ export class CasinoDataProvider {
   }
 
   async sync() {
-    const [rounds, signal, scoreboard, todayResults] = await Promise.all([
+    const [rounds, signal, scoreboard, historyBundle] = await Promise.all([
       fetchCasinoRounds(this.gameId, 200),
       fetchLatestCasinoSignal(this.gameId),
       fetchCasinoScoreboard(this.gameId),
-      fetchTodayResultSignals(this.gameId),
+      fetchTodayHistoryBundle(this.gameId),
     ]);
+
+    const todayResults = historyBundle.results;
 
     if (rounds.length > 0) {
       this.connected = true;

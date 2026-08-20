@@ -30,7 +30,7 @@ export function reconcileHistorySignal(signal) {
     else result = '';
   }
 
-  if (betZone && outcomeZone) {
+  if (!result && betZone && outcomeZone) {
     result = betZone === outcomeZone ? 'green' : 'loss';
   }
 
@@ -60,7 +60,60 @@ function parseOutcomeZoneStrict(signal) {
 }
 
 export function getResultLabel(signal) {
-  return isSignalGreen(signal) ? 'GREEN' : 'RED';
+  return isSignalGreen(signal) ? 'GREEN' : 'LOSS';
+}
+
+export function getResultEmoji(signal) {
+  return isSignalGreen(signal) ? '✅' : '❌';
+}
+
+/** Seq MoneyTix — string bruta do casino */
+export function getMoneytixSequenceDisplay(signal) {
+  return signal?.sequence || signal?.entry_condition || '—';
+}
+
+/** "Saiu AZUL/VERMELHO" — parse MoneyTix a partir de sequence/result_value */
+export function parseSaiuLabel(signal) {
+  const outcome = getSignalOutcomeColor(signal);
+  if (outcome?.label) return outcome.label;
+
+  const seq = String(signal?.sequence || signal?.result_value || '').toUpperCase();
+  if (seq.includes('AZUL') || seq.includes('JOGADOR') || seq.includes('PLAYER')) return 'AZUL';
+  if (seq.includes('VERMELHO') || seq.includes('BANCA') || seq.includes('BANKER') || seq.includes('CASA')) {
+    return 'VERMELHO';
+  }
+  if (seq.includes('EMPATE') || seq.includes('TIE')) return 'EMPATE';
+  return null;
+}
+
+export function getMoneytixHistorySummary(signal) {
+  const normalized = reconcileHistorySignal(signal);
+  const bet = getSignalBetColor(normalized);
+  const isGreen = isSignalGreen(normalized);
+  const sequenceRaw = getMoneytixSequenceDisplay(normalized);
+  const saiu = parseSaiuLabel(normalized);
+  const gales = Number(normalized.gales) || 3;
+  const currentGale = Number(normalized.current_gale) || 0;
+  const tieProtection = normalized.tie_protection === true || normalized.tie_protection === 'true';
+  const boardG = Number(normalized.scoreboard_green) || 0;
+  const boardR = Number(normalized.scoreboard_red) || 0;
+  const boardWr = normalized.win_rate ?? (boardG + boardR ? Math.round((boardG / (boardG + boardR)) * 10000) / 100 : 0);
+
+  return {
+    bet,
+    isGreen,
+    resultLabel: getResultLabel(normalized),
+    resultEmoji: getResultEmoji(normalized),
+    sequenceRaw,
+    saiu,
+    gales,
+    currentGale,
+    tieProtection,
+    boardG,
+    boardR,
+    boardWr,
+    resultHint: normalized.result_value || normalized.entry_condition || null,
+  };
 }
 
 export function getResultLabelPt(signal) {

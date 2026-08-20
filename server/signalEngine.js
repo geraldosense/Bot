@@ -2,6 +2,7 @@ import { shouldShowMonitoring } from './casinoDataProvider.js';
 import { scoreboardStore } from './scoreboardStore.js';
 import { classifyPlayResult, buildPlayResultAlert, resolveAlertOutcome, MAX_GALES } from './playResult.js';
 import { mergeSignalRecords, resolveSignalBet, reconcileSignalResult } from './signalBet.js';
+import { isRobotHistorySignal, backfillSequenceFromContext } from './historyUtils.js';
 
 const MAX_HISTORY = 200;
 
@@ -84,20 +85,23 @@ export class SignalEngine {
       bet_recommendation: play.bet_recommendation || play.bet,
       sequence: play.sequence,
       entry_condition: play.entry_condition,
+      result_value: play.result_value || null,
+      scoreboard_green: play.scoreboard_green || 0,
+      scoreboard_red: play.scoreboard_red || 0,
+      win_rate: play.win_rate ?? null,
+      tie_protection: play.tie_protection ?? false,
       current_gale: play.gale ?? 0,
       gales: play.maxGales ?? MAX_GALES,
     };
   }
 
   isHistoryResult(raw) {
-    if (!raw?.id) return false;
-    if (raw.signal_status === 'result') return true;
-    const r = String(raw.result || '').toLowerCase();
-    return r === 'green' || r === 'loss' || r === 'red';
+    return isRobotHistorySignal(raw);
   }
 
   /** Reconstrói histórico do dia — casino + disco + memória */
   rebuildDayHistory(todayResults = []) {
+    const context = [...todayResults, ...this.signalHistory];
     const candidates = [
       ...scoreboardStore.getPlays().map((p) => this.playToHistorySignal(p)),
       ...todayResults,
@@ -107,10 +111,11 @@ export class SignalEngine {
     const byId = new Map();
     for (const raw of candidates) {
       if (!this.isHistoryResult(raw)) continue;
-      const normalized = this.normalizeHistorySignal({
-        ...raw,
-        signal_status: 'result',
-      });
+      const withSeq = backfillSequenceFromContext(
+        { ...raw, signal_status: 'result' },
+        context,
+      );
+      const normalized = this.normalizeHistorySignal(withSeq);
       if (!normalized) continue;
       const id = String(normalized.id);
       byId.set(id, byId.has(id) ? mergeSignalRecords(byId.get(id), normalized) : normalized);

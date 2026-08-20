@@ -108,7 +108,7 @@ export function reconcileSignalResult(signal) {
   const outcomeZone = resolveOutcomeZone(signal);
   let result = parseResultFlag(signal);
 
-  if (betZone && outcomeZone) {
+  if (!result && betZone && outcomeZone) {
     if (betZone === outcomeZone) {
       result = 'green';
     } else if (outcomeZone === 'tie' && betZone !== 'tie') {

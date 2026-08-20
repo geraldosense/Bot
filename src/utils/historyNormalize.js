@@ -1,39 +1,84 @@
-import { reconcileHistorySignal, getHistorySummary } from './signalResult';
+import { reconcileHistorySignal, isSignalGreen } from './signalResult';
 
-function isResultSignal(signal) {
-  if (!signal?.id) return false;
-  if (signal.signal_status === 'result') return true;
-  const r = String(signal.result || '').toLowerCase();
-  return r === 'green' || r === 'loss' || r === 'red';
+export const PARTIAL_SCOREBOARD_MSG = 'Até agora estamos com';
+
+export function isPartialScoreboardSignal(signal) {
+  const raw = signal?.raw_message || signal?.raw_text || '';
+  return String(raw).includes(PARTIAL_SCOREBOARD_MSG);
 }
 
-/** Lista final do histórico — dedupe por id + reconciliação MoneyTix */
+/** 1 linha = 1 entrada finalizada pelo robô (igual MoneyTix) */
+export function isRobotHistorySignal(signal) {
+  if (!signal?.id) return false;
+  if (isPartialScoreboardSignal(signal)) return false;
+
+  const status = signal.signal_status;
+  if (status === 'green') return true;
+  if (status !== 'result') return false;
+
+  const r = String(signal.result || '').toLowerCase();
+  if (r === 'green' || r === 'loss' || r === 'red') return true;
+
+  return Boolean(signal.result_value);
+}
+
+export function backfillSequenceFromContext(signal, contextSignals = []) {
+  if (signal?.sequence) return signal;
+
+  const createdMs = new Date(signal.created_date || signal.criado_em || 0).getTime();
+  if (!Number.isFinite(createdMs)) return signal;
+
+  const prior = contextSignals.find((s) => {
+    if (!s?.sequence || s.signal_status !== 'confirmed') return false;
+    const ms = new Date(s.created_date || s.criado_em || 0).getTime();
+    return ms < createdMs;
+  });
+
+  if (!prior?.sequence) return signal;
+  return { ...signal, sequence: prior.sequence };
+}
+
+function mergeHistoryRecords(prev, next) {
+  return reconcileHistorySignal({
+    ...prev,
+    ...next,
+    entry_bet: next.entry_bet || prev.entry_bet,
+    bet: next.bet || prev.bet,
+    bet_recommendation: next.bet_recommendation || prev.bet_recommendation,
+    sequence: next.sequence || prev.sequence,
+    entry_condition: next.entry_condition || prev.entry_condition,
+    result_value: next.result_value || prev.result_value,
+    result: next.result || prev.result,
+    current_gale: next.current_gale ?? prev.current_gale,
+    scoreboard_green: next.scoreboard_green ?? prev.scoreboard_green,
+    scoreboard_red: next.scoreboard_red ?? prev.scoreboard_red,
+    win_rate: next.win_rate ?? prev.win_rate,
+    tie_protection: next.tie_protection ?? prev.tie_protection,
+    created_date: next.created_date || prev.created_date,
+    signal_status: 'result',
+  });
+}
+
+/** Lista final — dedupe por id, filtro MoneyTix, backfill sequence */
 export function normalizeHistoryList(signals = []) {
+  const context = [...signals];
   const byId = new Map();
 
   for (const raw of signals) {
-    if (!isResultSignal(raw)) continue;
-    const base = { ...raw, signal_status: 'result' };
-    const reconciled = reconcileHistorySignal(base);
+    if (!isRobotHistorySignal(raw)) continue;
+
+    const withSeq = backfillSequenceFromContext(
+      { ...raw, signal_status: 'result' },
+      context,
+    );
+    const reconciled = reconcileHistorySignal(withSeq);
     const id = String(reconciled.id);
+
     if (!byId.has(id)) {
       byId.set(id, reconciled);
       continue;
     }
-    const prev = byId.get(id);
-    byId.set(id, reconcileHistorySignal({
-      ...prev,
-      ...reconciled,
-      entry_bet: reconciled.entry_bet || prev.entry_bet,
-      bet: reconciled.bet || prev.bet,
-      bet_recommendation: reconciled.bet_recommendation || prev.bet_recommendation,
-      sequence: reconciled.sequence || prev.sequence,
-      entry_condition: reconciled.entry_condition || prev.entry_condition,
-      result_value: reconciled.result_value || prev.result_value,
-      result: reconciled.result || prev.result,
-      current_gale: reconciled.current_gale ?? prev.current_gale,
-      created_date: reconciled.created_date || prev.created_date,
-    }));
+    byId.set(id, mergeHistoryRecords(byId.get(id), reconciled));
   }
 
   return [...byId.values()].sort(
@@ -41,66 +86,67 @@ export function normalizeHistoryList(signals = []) {
   );
 }
 
-/** Estatísticas calculadas a partir do histórico real (como MoneyTix) */
+/** Stats do histórico filtrado (contagem local das entradas do robô) */
 export function computeHistoryStats(signals = []) {
   const list = normalizeHistoryList(signals);
   let greens = 0;
-  let reds = 0;
-  let g0Wins = 0;
-  let galeWins = 0;
-  let galeLosses = 0;
+  let losses = 0;
 
   for (const signal of list) {
-    const summary = getHistorySummary(signal);
-    const gale = Number(signal.current_gale) || 0;
-    if (summary.isGreen) {
-      greens++;
-      if (gale === 0) g0Wins++;
-      else galeWins++;
-    } else {
-      reds++;
-      if (gale > 0) galeLosses++;
-    }
+    if (isSignalGreen(signal)) greens++;
+    else losses++;
   }
 
-  const total = greens + reds;
+  const total = greens + losses;
   const winRate = total ? Math.min(100, Math.round((greens / total) * 10000) / 100) : 0;
-  const streak = computeHistoryStreak(list);
 
-  return { list, greens, reds, total, winRate, g0Wins, galeWins, galeLosses, streak };
+  return { list, greens, losses, reds: losses, total, winRate };
 }
 
-/** Sequência actual de GREEN ou RED (mais recente primeiro) */
-export function computeHistoryStreak(list = []) {
-  if (!list.length) return { type: null, count: 0 };
-
-  const firstGreen = getHistorySummary(list[0]).isGreen;
-  let count = 0;
-
-  for (const signal of list) {
-    if (getHistorySummary(signal).isGreen === firstGreen) count++;
-    else break;
+/** Placar MoneyTix — preferir totais IA do casino quando existem */
+export function resolveHistoryScoreboard(historySignals = [], scoreboard = null) {
+  const sbTotal = (Number(scoreboard?.greens) || 0) + (Number(scoreboard?.reds) || 0);
+  if (sbTotal > 0 && scoreboard?.source === 'casino_ia') {
+    return {
+      greens: scoreboard.greens,
+      losses: scoreboard.reds,
+      reds: scoreboard.reds,
+      total: sbTotal,
+      winRate: scoreboard.winRate,
+      source: 'casino_ia',
+    };
   }
 
-  return { type: firstGreen ? 'green' : 'red', count };
+  const latestWithBoard = normalizeHistoryList(historySignals).find(
+    (s) => (Number(s.scoreboard_green) || 0) + (Number(s.scoreboard_red) || 0) > 0,
+  );
+
+  if (latestWithBoard) {
+    const g = Number(latestWithBoard.scoreboard_green) || 0;
+    const r = Number(latestWithBoard.scoreboard_red) || 0;
+    const total = g + r;
+    return {
+      greens: g,
+      losses: r,
+      reds: r,
+      total,
+      winRate: total
+        ? Math.min(100, Math.round((g / total) * 10000) / 100)
+        : Number(latestWithBoard.win_rate) || 0,
+      source: 'signal_row',
+    };
+  }
+
+  return { ...computeHistoryStats(historySignals), source: 'history' };
 }
 
 export function filterHistoryList(list = [], filters = {}) {
-  const { result = 'all', gale = null, color = null } = filters;
+  const { result = 'all' } = filters;
 
   return list.filter((signal) => {
-    const summary = getHistorySummary(signal);
-    const galeNum = Number(signal.current_gale) || 0;
-
-    if (result === 'green' && !summary.isGreen) return false;
-    if (result === 'red' && summary.isGreen) return false;
-
-    if (gale === 'g0' && galeNum !== 0) return false;
-    if (gale === 'gale' && galeNum === 0) return false;
-
-    if (color === 'player' && summary.betZone !== 'player') return false;
-    if (color === 'banker' && summary.betZone !== 'banker') return false;
-
+    const green = isSignalGreen(signal);
+    if (result === 'green' && !green) return false;
+    if (result === 'loss' && green) return false;
     return true;
   });
 }

@@ -1,45 +1,26 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, ChevronDown, ChevronUp, History, Wifi, X, Flame, Zap } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, History, Wifi, X } from 'lucide-react';
 import { formatTime } from '../hooks/useWebSocket';
-import { getHistorySummary } from '../utils/signalResult';
-import { computeHistoryStats, filterHistoryList } from '../utils/historyNormalize';
-import { formatWinRate } from '../utils/scoreboard';
-import BacBoColorSphere, { BacBoColorSphereRow } from './BacBoColorSphere';
+import { getMoneytixHistorySummary } from '../utils/signalResult';
+import {
+  normalizeHistoryList,
+  resolveHistoryScoreboard,
+  filterHistoryList,
+} from '../utils/historyNormalize';
+import { formatWinRate, formatWinRatePrecise } from '../utils/scoreboard';
 
 const RESULT_FILTERS = [
   { id: 'all', label: 'Todos' },
   { id: 'green', label: 'GREEN' },
-  { id: 'red', label: 'RED' },
+  { id: 'loss', label: 'LOSS' },
 ];
 
-const EXTRA_FILTERS = [
-  { id: 'g0', label: 'Entrada', title: 'Acertou na entrada (sem gale)' },
-  { id: 'gale', label: 'Gale', title: 'Entradas com proteção / gale' },
-  { id: 'player', label: '🔵', title: 'Apostas em AZUL' },
-  { id: 'banker', label: '🔴', title: 'Apostas em VERMELHO' },
-];
-
-function HistoryRowMoneyTix({
-  signal,
-  index,
-  total,
-  isLatest,
-  live,
-  expanded,
-  onToggle,
-}) {
-  const {
-    resultLabel,
-    isGreen,
-    galePath,
-    sequence,
-    bet,
-    outcome,
-    galeLine,
-    playOutcomes,
-    attemptLabel,
-  } = getHistorySummary(signal);
+/** Linha igual ao moneytix01.com — 1 entrada do robô por linha */
+function HistoryRowMoneyTix({ signal, index, total, isLatest, live, expanded, onToggle }) {
+  const summary = getMoneytixHistorySummary(signal);
+  const { bet, isGreen, resultLabel, resultEmoji, sequenceRaw, saiu, gales, tieProtection, boardG, boardR, boardWr, resultHint } =
+    summary;
 
   return (
     <motion.div
@@ -57,132 +38,119 @@ function HistoryRowMoneyTix({
           onToggle();
         }
       }}
-      className={`grid grid-cols-[auto_1fr_auto] gap-x-3 gap-y-1.5 items-center px-3 py-2.5 rounded-xl border cursor-pointer select-none ${
+      className={`rounded-xl border px-3 py-2.5 cursor-pointer select-none transition-colors ${
         isGreen
           ? 'border-emerald-500/30 bg-emerald-950/20 hover:bg-emerald-950/30'
           : 'border-red-500/25 bg-red-950/15 hover:bg-red-950/25'
-      } ${isLatest && live ? 'ring-1 ring-cyan-400/40 shadow-[0_0_12px_rgba(34,211,238,0.12)]' : ''} transition-colors`}
+      } ${isLatest && live ? 'ring-1 ring-cyan-400/40 shadow-[0_0_12px_rgba(34,211,238,0.12)]' : ''}`}
     >
-      <div className="flex items-center gap-2 shrink-0">
-        <div
-          className={`w-7 h-7 rounded-lg flex items-center justify-center ${
-            isGreen ? 'bg-emerald-500' : 'bg-red-500'
-          }`}
-        >
-          {isGreen ? (
-            <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
-          ) : (
-            <X className="w-3.5 h-3.5 text-white" strokeWidth={3} />
-          )}
-        </div>
-        <div className="flex flex-col gap-0.5">
+      <div className="grid grid-cols-[auto_1fr_auto] gap-x-3 gap-y-1 items-center">
+        <div className="flex items-center gap-2 shrink-0">
+          <div
+            className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+              isGreen ? 'bg-emerald-500' : 'bg-red-500'
+            }`}
+          >
+            {isGreen ? (
+              <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
+            ) : (
+              <X className="w-3.5 h-3.5 text-white" strokeWidth={3} />
+            )}
+          </div>
           <span
-            className={`text-xs font-black tracking-wider ${
+            className={`text-xs font-black tracking-wider whitespace-nowrap ${
               isGreen ? 'text-emerald-400' : 'text-red-400'
             }`}
           >
-            {resultLabel}
+            {resultLabel} {resultEmoji}
           </span>
-          <BacBoColorSphereRow zones={galePath} size="sm" gap="gap-0.5" />
         </div>
-      </div>
 
-      <div className="min-w-0 space-y-1">
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span className="text-[9px] font-bold text-zinc-500 uppercase shrink-0">Aposta</span>
-            {bet ? (
-              <span className="inline-flex items-center gap-1">
-                <BacBoColorSphere zone={bet.zone} size="sm" />
-                <span className="text-[10px] font-bold text-zinc-200 truncate">{bet.label}</span>
-              </span>
-            ) : (
-              <span className="text-zinc-600 text-[10px]">—</span>
+        <div className="min-w-0 space-y-1">
+          <div className="flex items-center gap-3 flex-wrap text-[10px]">
+            <div className="flex items-center gap-1 min-w-0">
+              <span className="text-[9px] font-bold text-zinc-500 uppercase shrink-0">Aposta</span>
+              {bet ? (
+                <span className="font-bold text-zinc-200 truncate">
+                  {bet.emoji} {bet.label}
+                </span>
+              ) : (
+                <span className="text-zinc-600">—</span>
+              )}
+            </div>
+            {!isGreen && saiu && (
+              <div className="flex items-center gap-1">
+                <span className="text-[9px] font-bold text-zinc-500 uppercase shrink-0">Saiu</span>
+                <span className="font-bold text-zinc-300">{saiu}</span>
+              </div>
             )}
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-bold text-zinc-500 uppercase shrink-0">Seq</span>
-            <BacBoColorSphereRow zones={sequence} size="sm" gap="gap-0.5" />
-          </div>
-        </div>
-        <p
-          className={`text-[9px] font-semibold uppercase tracking-wide ${
-            expanded ? '' : 'truncate'
-          } ${isGreen ? 'text-emerald-500/70' : 'text-red-500/70'}`}
-        >
-          {galeLine}
-          {outcome && !isGreen && bet && outcome.zone !== bet.zone && (
-            <span className="text-zinc-500 normal-case">
-              {' '}
-              · Saiu {outcome.label}
+          <div className="flex items-start gap-1.5 min-w-0">
+            <span className="text-[9px] font-bold text-zinc-500 uppercase shrink-0 pt-0.5">Seq</span>
+            <span className="text-[10px] font-mono text-zinc-400 leading-snug break-all line-clamp-2">
+              {sequenceRaw}
             </span>
-          )}
-        </p>
-        {expanded && playOutcomes.length > 0 && (
-          <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-            <span className="text-[8px] font-bold text-zinc-500 uppercase shrink-0">Mesa</span>
-            <BacBoColorSphereRow zones={playOutcomes} size="sm" gap="gap-0.5" />
-            <span className="text-[8px] text-zinc-600">· {attemptLabel}</span>
           </div>
-        )}
-        {!expanded && playOutcomes.length > 0 && (
-          <p className="text-[8px] text-zinc-600">Toque para ver rodadas da mesa</p>
-        )}
+          {resultHint && !expanded && (
+            <p className="text-[9px] text-zinc-600 truncate">{resultHint}</p>
+          )}
+        </div>
+
+        <div className="text-right shrink-0">
+          <span className="text-[10px] tabular-nums text-zinc-400 font-medium">
+            {formatTime(signal.created_date)}
+          </span>
+          <span className="block text-[8px] text-zinc-600 tabular-nums">
+            #{total - index}
+            {isLatest && live ? (
+              <span className="ml-1 text-cyan-500 font-bold">· novo</span>
+            ) : null}
+          </span>
+        </div>
       </div>
 
-      <div className="text-right shrink-0">
-        <span className="text-[10px] tabular-nums text-zinc-400 font-medium">
-          {formatTime(signal.created_date)}
-        </span>
-        <span className="block text-[8px] text-zinc-600 tabular-nums">
-          #{total - index}
-          {isLatest && live ? (
-            <span className="ml-1 text-cyan-500 font-bold">· novo</span>
-          ) : null}
-        </span>
-      </div>
+      {expanded && (
+        <div className="mt-2.5 pt-2.5 border-t border-zinc-800/80 space-y-2 text-[10px]">
+          {bet && (
+            <p className="text-zinc-400">
+              <span className="text-zinc-500 font-bold uppercase text-[9px]">Recomendação IA · </span>
+              {bet.emoji} {bet.label}
+            </p>
+          )}
+          <p className="text-zinc-400">
+            <span className="text-zinc-500 font-bold uppercase text-[9px]">Proteções · </span>
+            {gales} gales
+            {tieProtection ? ' · proteção empate activa' : ''}
+          </p>
+          {(boardG > 0 || boardR > 0) && (
+            <p className="text-zinc-300">
+              <span className="text-zinc-500 font-bold uppercase text-[9px]">Placar no momento · </span>
+              {boardG} GREEN · {boardR} LOSS · {formatWinRatePrecise(boardWr)}
+            </p>
+          )}
+          <p className="text-zinc-500 font-mono text-[9px] break-all">{sequenceRaw}</p>
+        </div>
+      )}
     </motion.div>
   );
 }
 
-function StatsBar({ stats, live, streak }) {
+function StatsBar({ stats, live, entryCount }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <span className="inline-flex items-center gap-1 rounded-lg bg-zinc-800/70 border border-zinc-700/50 px-2 py-1 text-[10px] font-bold text-zinc-300">
         <History className="w-3 h-3 text-zinc-500" />
-        {stats.total} entradas
+        {entryCount} entradas robô
       </span>
       <span className="inline-flex items-center rounded-lg bg-emerald-500/15 border border-emerald-500/30 px-2 py-1 text-[10px] font-bold text-emerald-400">
         {stats.greens} GREEN
       </span>
       <span className="inline-flex items-center rounded-lg bg-red-500/15 border border-red-500/30 px-2 py-1 text-[10px] font-bold text-red-400">
-        {stats.reds} RED
+        {stats.losses ?? stats.reds} LOSS
       </span>
       {stats.total > 0 && (
         <span className="inline-flex items-center rounded-lg bg-cyan-500/10 border border-cyan-500/25 px-2 py-1 text-[10px] font-bold text-cyan-400">
           {formatWinRate(stats.winRate)}
-        </span>
-      )}
-      {stats.g0Wins > 0 && (
-        <span
-          className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 text-[10px] font-bold text-emerald-300"
-          title="Acertos na entrada directa (sem gale)"
-        >
-          <Zap className="w-3 h-3" />
-          {stats.g0Wins} entrada
-        </span>
-      )}
-      {streak?.count > 1 && (
-        <span
-          className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold border ${
-            streak.type === 'green'
-              ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-300'
-              : 'bg-red-500/10 border-red-500/25 text-red-300'
-          }`}
-          title="Sequência actual consecutiva"
-        >
-          <Flame className="w-3 h-3" />
-          {streak.count}× {streak.type === 'green' ? 'GREEN' : 'RED'}
         </span>
       )}
       {live && (
@@ -197,7 +165,7 @@ function StatsBar({ stats, live, streak }) {
 
 export default function SignalHistory({
   history,
-  scoreboard: _scoreboard,
+  scoreboard = null,
   title = 'HISTÓRICO DE ENTRADAS',
   limit = 8,
   showVerMais = true,
@@ -208,24 +176,20 @@ export default function SignalHistory({
 }) {
   const [listExpanded, setListExpanded] = useState(defaultExpanded || variant === 'robot');
   const [resultFilter, setResultFilter] = useState('all');
-  const [extraFilter, setExtraFilter] = useState(null);
   const [expandedRowId, setExpandedRowId] = useState(null);
   const [latestHighlightId, setLatestHighlightId] = useState(null);
   const listRef = useRef(null);
   const prevTopIdRef = useRef(null);
 
-  const historyStats = useMemo(() => computeHistoryStats(history), [history]);
-  const { list: allResults, streak, ...totals } = historyStats;
-  const stats = totals;
+  const allResults = useMemo(() => normalizeHistoryList(history), [history]);
+  const boardStats = useMemo(
+    () => resolveHistoryScoreboard(history, scoreboard),
+    [history, scoreboard],
+  );
 
   const filtered = useMemo(
-    () =>
-      filterHistoryList(allResults, {
-        result: resultFilter,
-        gale: extraFilter === 'g0' || extraFilter === 'gale' ? extraFilter : null,
-        color: extraFilter === 'player' || extraFilter === 'banker' ? extraFilter : null,
-      }),
-    [allResults, resultFilter, extraFilter],
+    () => filterHistoryList(allResults, { result: resultFilter }),
+    [allResults, resultFilter],
   );
 
   const pageLimit = variant === 'robot' ? Math.max(limit, 100) : limit;
@@ -240,28 +204,11 @@ export default function SignalHistory({
     setLatestHighlightId(latestId);
 
     const el = listRef.current;
-    if (el && el.scrollTop < 48) {
-      el.scrollTop = 0;
-    }
+    if (el && el.scrollTop < 48) el.scrollTop = 0;
 
     const timer = setTimeout(() => setLatestHighlightId(null), 4000);
     return () => clearTimeout(timer);
   }, [latestId]);
-
-  const toggleExtraFilter = (id) => {
-    setExtraFilter((prev) => (prev === id ? null : id));
-  };
-
-  const emptyFilterLabel = useMemo(() => {
-    const parts = [];
-    if (resultFilter === 'green') parts.push('GREEN');
-    if (resultFilter === 'red') parts.push('RED');
-    if (extraFilter === 'g0') parts.push('entrada directa');
-    if (extraFilter === 'gale') parts.push('com gale');
-    if (extraFilter === 'player') parts.push('AZUL');
-    if (extraFilter === 'banker') parts.push('VERMELHO');
-    return parts.length ? parts.join(' · ') : 'com estes filtros';
-  }, [resultFilter, extraFilter]);
 
   if (!allResults.length) {
     return (
@@ -274,10 +221,10 @@ export default function SignalHistory({
       >
         <History className={`w-8 h-8 mx-auto mb-2 ${isRobot ? 'text-emerald-700' : 'text-zinc-600'}`} />
         <p className={`text-sm font-semibold ${isRobot ? 'text-zinc-400' : 'text-zinc-500'}`}>
-          Sem entradas registadas hoje
+          Sem entradas do robô hoje
         </p>
         <p className="text-zinc-600 text-xs mt-1 max-w-xs mx-auto">
-          Cada entrada confirmada pelo robô aparece aqui com GREEN/RED, aposta, sequência e horário
+          Cada entrada confirmada e finalizada pela IA aparece aqui — igual ao MoneyTix
         </p>
       </div>
     );
@@ -298,7 +245,7 @@ export default function SignalHistory({
           <div>
             <h3 className="text-white font-black text-sm tracking-wide uppercase">{title}</h3>
             <p className="text-zinc-600 text-[10px] mt-0.5">
-              GREEN/RED · Aposta · Seq · Horário — toque numa linha para ver a mesa
+              1 linha = 1 entrada do robô · GREEN/LOSS · Aposta · Seq · Hora
             </p>
           </div>
           {showVerMais && hasMore && (
@@ -322,7 +269,7 @@ export default function SignalHistory({
           )}
         </div>
 
-        <StatsBar stats={stats} live={live} streak={streak} />
+        <StatsBar stats={boardStats} live={live} entryCount={allResults.length} />
 
         <div className="flex gap-1.5 p-0.5 rounded-lg bg-zinc-900/80 border border-zinc-800/80">
           {RESULT_FILTERS.map((f) => (
@@ -334,37 +281,19 @@ export default function SignalHistory({
                 resultFilter === f.id
                   ? f.id === 'green'
                     ? 'bg-emerald-600 text-white shadow-sm'
-                    : f.id === 'red'
+                    : f.id === 'loss'
                       ? 'bg-red-600 text-white shadow-sm'
                       : 'bg-zinc-700 text-white shadow-sm'
                   : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >
               {f.label}
-              {f.id === 'green' && stats.greens > 0 && (
-                <span className="ml-1 opacity-80">({stats.greens})</span>
+              {f.id === 'green' && boardStats.greens > 0 && (
+                <span className="ml-1 opacity-80">({boardStats.greens})</span>
               )}
-              {f.id === 'red' && stats.reds > 0 && (
-                <span className="ml-1 opacity-80">({stats.reds})</span>
+              {f.id === 'loss' && (boardStats.losses ?? boardStats.reds) > 0 && (
+                <span className="ml-1 opacity-80">({boardStats.losses ?? boardStats.reds})</span>
               )}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex flex-wrap gap-1.5">
-          {EXTRA_FILTERS.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              title={f.title}
-              onClick={() => toggleExtraFilter(f.id)}
-              className={`px-2.5 py-1 rounded-md text-[10px] font-bold border transition-all ${
-                extraFilter === f.id
-                  ? 'bg-zinc-700 border-zinc-500 text-white'
-                  : 'bg-zinc-900/60 border-zinc-800 text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              {f.label}
             </button>
           ))}
         </div>
@@ -384,7 +313,7 @@ export default function SignalHistory({
         <AnimatePresence mode="popLayout">
           {visible.length === 0 ? (
             <p className="text-center text-zinc-600 text-xs py-6">
-              Nenhuma entrada {emptyFilterLabel} hoje
+              Nenhuma entrada {resultFilter === 'green' ? 'GREEN' : 'LOSS'} hoje
             </p>
           ) : (
             visible.map((sig, i) => {
@@ -407,9 +336,8 @@ export default function SignalHistory({
       </div>
 
       <p className="text-center text-zinc-600 text-[9px] mt-2 pt-2 border-t border-zinc-800/50">
-        {visible.length} de {filtered.length} entradas
-        {resultFilter !== 'all' || extraFilter ? ` · filtrado` : ''} · dia operacional BR
-        {stats.galeWins > 0 ? ` · ${stats.galeWins} acertos com gale` : ''}
+        {visible.length} de {filtered.length} entradas do robô
+        {resultFilter !== 'all' ? ` · ${resultFilter.toUpperCase()}` : ''} · dia operacional BR
       </p>
     </motion.div>
   );
