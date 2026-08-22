@@ -47,7 +47,13 @@ export default async function loginHandler(req, res) {
       return sendJson(res, 401, { error: 'Email ou password incorretos' });
     }
 
-    const user = (await recordLogin(raw.id)) || sanitizeUser(raw);
+    let user = sanitizeUser(raw);
+    try {
+      user = (await recordLogin(raw.id)) || user;
+    } catch (err) {
+      console.warn('[vercel] recordLogin falhou — sessão mantida:', err.message);
+    }
+
     const token = signToken(user);
     return sendJson(res, 200, { token, user });
   } catch (err) {

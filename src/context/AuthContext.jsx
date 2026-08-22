@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { fetchJson } from '../lib/api';
 
 const AuthContext = createContext(null);
@@ -7,6 +7,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(() => localStorage.getItem('bacbo_token'));
   const [loading, setLoading] = useState(true);
+  const skipMeRef = useRef(false);
 
   const fetchMe = useCallback(async (t) => {
     try {
@@ -15,17 +16,36 @@ export function AuthProvider({ children }) {
       });
       setUser(data.user);
       return data.user;
-    } catch {
-      localStorage.removeItem('bacbo_token');
-      setToken(null);
-      setUser(null);
+    } catch (err) {
+      const msg = String(err?.message || '').toLowerCase();
+      const authError =
+        msg.includes('não autenticado') ||
+        msg.includes('nao autenticado') ||
+        msg.includes('sessão expirada') ||
+        msg.includes('sessao expirada') ||
+        msg.includes('utilizador não encontrado') ||
+        msg.includes('utilizador nao encontrado');
+
+      if (authError) {
+        localStorage.removeItem('bacbo_token');
+        setToken(null);
+        setUser(null);
+      }
       return null;
     }
   }, []);
 
   useEffect(() => {
-    if (token) fetchMe(token).finally(() => setLoading(false));
-    else setLoading(false);
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+    if (skipMeRef.current) {
+      skipMeRef.current = false;
+      setLoading(false);
+      return;
+    }
+    fetchMe(token).finally(() => setLoading(false));
   }, [token, fetchMe]);
 
   useEffect(() => {
@@ -48,8 +68,10 @@ export function AuthProvider({ children }) {
       body: JSON.stringify({ email, password }),
     });
     localStorage.setItem('bacbo_token', data.token);
+    skipMeRef.current = true;
     setToken(data.token);
     setUser(data.user);
+    setLoading(false);
     return data;
   };
 
@@ -60,8 +82,10 @@ export function AuthProvider({ children }) {
       body: JSON.stringify({ name, email, password }),
     });
     localStorage.setItem('bacbo_token', data.token);
+    skipMeRef.current = true;
     setToken(data.token);
     setUser(data.user);
+    setLoading(false);
     return data;
   };
 
