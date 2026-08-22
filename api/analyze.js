@@ -1,18 +1,20 @@
-import { handleError, requireVipUser, sendJson } from '../../server/vercelHttp.js';
-import { runVipSync, getVipRuntime } from '../../server/vercelVip.js';
-
-export { config } from '../../server/vercelHttp.js';
-
 export default async function analyzeHandler(req, res) {
+  res.setHeader('Content-Type', 'application/json');
   if (req.method !== 'POST') {
-    return sendJson(res, 405, { error: 'Method not allowed' });
+    res.statusCode = 405;
+    return res.end(JSON.stringify({ error: 'Method not allowed' }));
   }
   try {
+    const { requireVipUser } = await import('../../server/vercelHttp.js');
+    const { runVipSync } = await import('../../server/vercelVip.js');
     await requireVipUser(req);
-    await runVipSync();
-    const { engine } = await getVipRuntime();
-    return sendJson(res, 200, { ok: true, snapshot: engine.getSnapshot() });
+    const snapshot = await runVipSync();
+    res.statusCode = 200;
+    res.end(JSON.stringify({ ok: true, snapshot }));
   } catch (err) {
-    handleError(res, err);
+    res.statusCode = err.status || 500;
+    res.end(JSON.stringify({ error: err.message || 'Erro interno' }));
   }
 }
+
+export const config = { maxDuration: 10 };

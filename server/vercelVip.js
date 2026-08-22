@@ -1,9 +1,9 @@
 import { SignalEngine } from './signalEngine.js';
 import { CasinoDataProvider } from './casinoDataProvider.js';
-import { senseSpotStore } from './senseSpotStore.js';
 
 let runtimePromise = null;
-let dataReady = null;
+let lastSnapshot = null;
+let lastSyncAt = 0;
 
 export function getVipRuntime() {
   if (!runtimePromise) {
@@ -21,19 +21,20 @@ export function getVipRuntime() {
   return runtimePromise;
 }
 
-async function ensureVipData() {
-  if (!dataReady) {
-    dataReady = (async () => {
-      const { engine } = await getVipRuntime();
-      await senseSpotStore.init();
-      await engine.bootstrapHistory();
-    })();
+export async function runVipSync() {
+  const now = Date.now();
+  if (lastSnapshot && now - lastSyncAt < 2500) {
+    return lastSnapshot;
   }
-  return dataReady;
+
+  const { engine, casino } = await getVipRuntime();
+  await casino.sync({ light: true });
+  lastSnapshot = engine.getSnapshot();
+  lastSyncAt = Date.now();
+  return lastSnapshot;
 }
 
-export async function runVipSync() {
-  await ensureVipData();
-  const { casino } = await getVipRuntime();
-  await casino.sync();
+export async function getVipSnapshot() {
+  if (lastSnapshot) return lastSnapshot;
+  return runVipSync();
 }

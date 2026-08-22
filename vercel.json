@@ -13,6 +13,7 @@
   ],
   "functions": {
     "api/index.js": { "maxDuration": 10 },
+    "api/health.js": { "maxDuration": 10 },
     "api/auth/login.js": { "maxDuration": 10 },
     "api/auth/me.js": { "maxDuration": 10 },
     "api/auth/register.js": { "maxDuration": 10 },

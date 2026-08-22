@@ -24,25 +24,20 @@ export function getBearerToken(req) {
 }
 
 export async function requireVipUser(req) {
-  const { verifyToken, sanitizeUser, isVipOrAbove } = await import('../auth/index.js');
-  const { findById } = await import('../auth/userStore.js');
+  const { verifyToken, sanitizeUser, isVipOrAbove, ensureAuthReady } = await import('./auth/index.js');
+  const { findById } = await import('./auth/userStore.js');
 
+  await ensureAuthReady();
   const token = getBearerToken(req);
-  if (!token) {
-    throw Object.assign(new Error('Não autenticado'), { status: 401 });
-  }
+  if (!token) throw Object.assign(new Error('Não autenticado'), { status: 401 });
+
   const payload = verifyToken(token);
-  if (!payload) {
-    throw Object.assign(new Error('Sessão expirada'), { status: 401 });
-  }
+  if (!payload) throw Object.assign(new Error('Sessão expirada'), { status: 401 });
+
   const user = sanitizeUser(await findById(payload.sub));
-  if (!user) {
-    throw Object.assign(new Error('Utilizador não encontrado'), { status: 401 });
-  }
+  if (!user) throw Object.assign(new Error('Utilizador não encontrado'), { status: 401 });
   if (!isVipOrAbove(user)) {
-    throw Object.assign(new Error('Acesso VIP necessário. Aguarda aprovação do admin.'), {
-      status: 403,
-    });
+    throw Object.assign(new Error('Acesso VIP necessário. Aguarda aprovação do admin.'), { status: 403 });
   }
   return user;
 }
