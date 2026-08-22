@@ -17,7 +17,6 @@ import {
 } from 'lucide-react';
 import SenseBotLogo from './SenseBotLogo';
 import BottomNav from './BottomNav';
-import WhatsAppGroupCard from './WhatsAppGroupCard';
 import { VipStatusBanner } from './VipLockedPanel';
 
 const JOURNEY = [
@@ -28,16 +27,9 @@ const JOURNEY = [
     done: true,
   },
   {
-    id: 'whatsapp',
-    title: 'Grupo WhatsApp',
-    desc: 'Entra na comunidade oficial — suporte e pedidos VIP.',
-    done: false,
-    action: 'whatsapp',
-  },
-  {
     id: 'request',
     title: 'Pedir acesso VIP',
-    desc: 'No grupo, solicita aprovação para os robôs dos casinos.',
+    desc: 'Solicita aprovação ao Proprietário para desbloquear os robôs dos casinos.',
     done: false,
   },
   {
@@ -129,10 +121,9 @@ export default function MemberDashboard({ user }) {
 
   const journeyWithState = JOURNEY.map((step) => {
     if (step.id === 'register') return { ...step, done: true };
-    if (vipPending && step.id === 'whatsapp') return { ...step, done: true };
     if (vipPending && step.id === 'request') return { ...step, done: true };
     if (vipPending && step.id === 'approve') return { ...step, active: true };
-    if (!vipPending && step.id === 'whatsapp') return { ...step, active: true };
+    if (!vipPending && step.id === 'request') return { ...step, active: true };
     return step;
   });
 
@@ -222,17 +213,6 @@ export default function MemberDashboard({ user }) {
                     )}
                   </p>
                   <p className="text-zinc-500 text-xs mt-1 leading-relaxed">{step.desc}</p>
-                  {step.action === 'whatsapp' && step.active && (
-                    <div className="mt-2">
-                      <WhatsAppGroupCard
-                        compact
-                        showHint={false}
-                        title=""
-                        description=""
-                        buttonLabel="Entrar no WhatsApp"
-                      />
-                    </div>
-                  )}
                 </div>
               </div>
             ))}
@@ -339,13 +319,6 @@ export default function MemberDashboard({ user }) {
           transition={{ delay: 0.25 }}
           className="space-y-3"
         >
-          <WhatsAppGroupCard
-            title="Grupo WhatsApp oficial"
-            description="Suporte, avisos e pedido de acesso VIP. Passo essencial antes dos robôs."
-            buttonLabel="Entrar no grupo WhatsApp"
-            showHint
-          />
-
           <Link
             to="/Support"
             className="flex items-center justify-between gap-3 w-full rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-3.5 hover:bg-zinc-800/50 transition-colors group"

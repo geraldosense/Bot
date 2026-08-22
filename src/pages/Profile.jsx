@@ -4,7 +4,6 @@ import { Crown, Calendar, LogOut, User as UserIcon, RefreshCw } from 'lucide-rea
 import { useAuth } from '../context/AuthContext';
 import BottomNav from '../components/BottomNav';
 import { VipStatusBanner } from '../components/VipLockedPanel';
-import WhatsAppGroupCard from '../components/WhatsAppGroupCard';
 import { getRoleLabel } from '../utils/roles';
 
 export default function Profile() {
@@ -41,7 +40,6 @@ export default function Profile() {
         {!isVip && (
           <div className="mb-4 space-y-3">
             <VipStatusBanner user={user} compact />
-            <WhatsAppGroupCard compact showHint={false} />
             <button
               onClick={handleRefresh}
               disabled={checking}

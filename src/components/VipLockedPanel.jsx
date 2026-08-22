@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Lock, Crown, Clock } from 'lucide-react';
-import WhatsAppGroupCard from './WhatsAppGroupCard';
 
 export function VipStatusBanner({ user, compact = false }) {
   const pending = user?.vipRequest?.status === 'pending';
@@ -42,7 +41,7 @@ export function VipStatusBanner({ user, compact = false }) {
               to="/Support"
               className="inline-block mt-2 text-emerald-400 text-xs font-bold hover:underline"
             >
-              Suporte WhatsApp →
+              Centro de ajuda →
             </Link>
           )}
         </div>
@@ -68,15 +67,12 @@ export default function VipLockedPanel({ title = 'Robôs dos casinos' }) {
         <Lock className="w-3.5 h-3.5" />
         Aguarda verificação VIP
       </div>
-      <div className="pt-2">
-        <WhatsAppGroupCard
-          compact
-          title="Precisas de ajuda ou VIP?"
-          description="Entra no grupo WhatsApp oficial para suporte e pedido de acesso VIP."
-          buttonLabel="Grupo WhatsApp — Sense Bot"
-          showHint={false}
-        />
-      </div>
+      <Link
+        to="/Support"
+        className="inline-block text-emerald-400 text-xs font-bold hover:underline"
+      >
+        Centro de ajuda →
+      </Link>
     </div>
   );
 }

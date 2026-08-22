@@ -7,7 +7,6 @@ import {
   Shield,
   HelpCircle,
   Gamepad2,
-  Clock,
   BookOpen,
   Layers,
   Wallet,
@@ -15,7 +14,6 @@ import {
   Play,
 } from 'lucide-react';
 import BottomNav from '../components/BottomNav';
-import WhatsAppGroupCard from '../components/WhatsAppGroupCard';
 import { SITE_GAMES_GUIDE, PLAYING_TUTORIALS } from '../config/gamesGuide';
 
 const TUTORIAL_ICONS = {
@@ -29,7 +27,7 @@ const FAQ_GERAL = [
   {
     icon: Crown,
     q: 'Como me torno VIP?',
-    a: 'Regista-te no site, entra no grupo WhatsApp oficial e aguarda que o Proprietário aprove o teu acesso VIP.',
+    a: 'Regista-te no site e aguarda que o Proprietário aprove o teu acesso VIP. Podes verificar o estado no Perfil.',
   },
   {
     icon: Shield,
@@ -38,8 +36,8 @@ const FAQ_GERAL = [
   },
   {
     icon: HelpCircle,
-    q: 'Como contactar o suporte?',
-    a: 'Usa o botão Suporte WhatsApp. A mensagem é preenchida automaticamente — basta seleccionar o grupo Sense Bot e enviar.',
+    q: 'Como obter ajuda?',
+    a: 'Consulta esta Central de Ajuda — tutoriais, FAQ e guias dos jogos. Para VIP, verifica o estado no teu Perfil.',
   },
 ];
 
@@ -252,45 +250,6 @@ export default function Support() {
           <div>
             <h1 className="text-xl font-black text-white">Suporte</h1>
             <p className="text-zinc-500 text-xs">Estamos aqui para ajudar</p>
-          </div>
-        </div>
-
-        {/* Caixa de contacto rápido */}
-        <div
-          className="relative overflow-hidden rounded-2xl border border-cyan-500/20 p-4 mb-6"
-          style={{
-            background:
-              'linear-gradient(135deg, rgba(6, 78, 120, 0.25) 0%, rgba(9, 9, 11, 0.9) 100%)',
-          }}
-        >
-          <div
-            className="absolute inset-0 opacity-[0.06] pointer-events-none"
-            style={{
-              backgroundImage:
-                'linear-gradient(rgba(255,255,255,0.9) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.9) 1px, transparent 1px)',
-              backgroundSize: '24px 24px',
-            }}
-          />
-
-          <div className="relative">
-            <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-900/60 border border-zinc-700/60 mb-3">
-              <Clock className="w-3 h-3 text-cyan-400" />
-              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">
-                Atendimento 24/7
-              </span>
-            </div>
-
-            <p className="text-white font-black text-base mb-1">Precisas de ajuda rápida?</p>
-            <p className="text-zinc-400 text-xs mb-4 leading-relaxed">
-              Contacta-nos pelo WhatsApp para suporte instantâneo e pedidos VIP.
-            </p>
-
-            <WhatsAppGroupCard
-              mode="support"
-              variant="inline"
-              buttonLabel="Suporte WhatsApp"
-              showHint
-            />
           </div>
         </div>
 
