@@ -1,38 +1,30 @@
 import serverless from 'serverless-http';
-import { createApp } from '../server/createApp.js';
+import { createVercelApp } from '../server/createVercelApp.js';
+import { sendJson } from '../server/vercelHttp.js';
 
-export const config = {
-  maxDuration: 10,
-};
+export const config = { maxDuration: 10 };
 
 let handlerPromise = null;
 
 function getHandler() {
   if (!handlerPromise) {
-    handlerPromise = createApp({ vercel: true }).then(({ app }) =>
-      serverless(app, { binary: false }),
-    );
+    handlerPromise = createVercelApp().then(({ app }) => serverless(app, { binary: false }));
   }
   return handlerPromise;
 }
 
-export default async function vercelHandler(req, res) {
+/** Rotas /api/admin/* — resto da API tem ficheiros dedicados */
+export default async function adminHandler(req, res) {
   const path = req.url?.split('?')[0] || '';
-
-  if (path === '/api/health') {
-    res.statusCode = 200;
-    res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ status: 'ok', platform: 'vercel' }));
-    return;
+  if (!path.startsWith('/api/admin')) {
+    return sendJson(res, 404, { error: 'Rota API não encontrada' });
   }
 
   try {
     const handler = await getHandler();
     return await handler(req, res);
   } catch (err) {
-    console.error('[vercel] API error:', err);
-    res.statusCode = 500;
-    res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ error: err.message || 'Erro interno do servidor' }));
+    console.error('[vercel] admin error:', err);
+    sendJson(res, 500, { error: err.message || 'Erro interno' });
   }
 }

@@ -266,6 +266,36 @@ export function shouldShowMonitoring(signal) {
   return ageMs > 300000;
 }
 
+/** Versão rápida para Vercel Hobby (10s) — uma página, sem paginação completa */
+export async function fetchTodayHistoryBundleLight(gameId = GAME_ID, limit = 80) {
+  try {
+    const iso = dayStartIso();
+    const base = `${CASINO_SUPABASE_URL}/rest/v1/sinais?jogo=eq.${gameId}&criado_em=gte.${encodeURIComponent(iso)}`;
+    const timeout = { signal: AbortSignal.timeout(process.env.VERCEL ? 4000 : 12000) };
+
+    const [resultRes, contextRes] = await Promise.all([
+      fetch(
+        `${base}&signal_status=eq.result&order=criado_em.desc&limit=${limit}&select=${SINAL_RESULT_SELECT}`,
+        { headers: casinoHeaders(), ...timeout },
+      ),
+      fetch(
+        `${base}&signal_status=in.(result,confirmed,gale_update)&order=criado_em.desc&limit=${limit}&select=${SINAL_CONTEXT_SELECT}`,
+        { headers: casinoHeaders(), ...timeout },
+      ),
+    ]);
+
+    const resultRows = resultRes.ok ? await resultRes.json() : [];
+    const contextRows = contextRes.ok ? await contextRes.json() : [];
+    const context = contextRows.map(mapCasinoSignal).filter(Boolean);
+    const rawResults = (Array.isArray(resultRows) ? resultRows : []).map(mapCasinoSignal).filter(Boolean);
+    const results = filterRobotHistorySignals(rawResults, context);
+    return { results, context };
+  } catch (err) {
+    console.error('[casino] Histórico light:', err.message);
+    return { results: [], context: [] };
+  }
+}
+
 export class CasinoDataProvider {
   constructor({ onRounds, onSignal, onStatus, onSyncScoreboard }) {
     this.onRounds = onRounds;
@@ -290,12 +320,15 @@ export class CasinoDataProvider {
     if (this.pollTimer) clearInterval(this.pollTimer);
   }
 
-  async sync() {
+  async sync(options = {}) {
+    const light = options.light || process.env.VERCEL;
+    const roundLimit = light ? 80 : 200;
+
     const [rounds, signal, scoreboard, historyBundle] = await Promise.all([
-      fetchCasinoRounds(this.gameId, 200),
+      fetchCasinoRounds(this.gameId, roundLimit),
       fetchLatestCasinoSignal(this.gameId),
       fetchCasinoScoreboard(this.gameId),
-      fetchTodayHistoryBundle(this.gameId),
+      light ? fetchTodayHistoryBundleLight(this.gameId) : fetchTodayHistoryBundle(this.gameId),
     ]);
 
     const todayResults = historyBundle.results;

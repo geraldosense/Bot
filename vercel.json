@@ -12,11 +12,14 @@
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "functions": {
-    "api/index.js": {
-      "maxDuration": 10
-    },
-    "api/auth/login.js": {
-      "maxDuration": 10
-    }
+    "api/index.js": { "maxDuration": 10 },
+    "api/auth/login.js": { "maxDuration": 10 },
+    "api/auth/me.js": { "maxDuration": 10 },
+    "api/auth/register.js": { "maxDuration": 10 },
+    "api/auth/presence.js": { "maxDuration": 10 },
+    "api/snapshot.js": { "maxDuration": 10 },
+    "api/signals.js": { "maxDuration": 10 },
+    "api/scoreboard.js": { "maxDuration": 10 },
+    "api/analyze.js": { "maxDuration": 10 }
   }
 }
