@@ -1,3 +1,6 @@
+import { verifyToken, sanitizeUser, isVipOrAbove, ensureAuthReady } from './auth/index.js';
+import { findById } from './auth/userStore.js';
+
 export const config = { maxDuration: 10 };
 
 export function sendJson(res, status, data) {
@@ -24,9 +27,6 @@ export function getBearerToken(req) {
 }
 
 export async function requireVipUser(req) {
-  const { verifyToken, sanitizeUser, isVipOrAbove, ensureAuthReady } = await import('./auth/index.js');
-  const { findById } = await import('./auth/userStore.js');
-
   await ensureAuthReady();
   const token = getBearerToken(req);
   if (!token) throw Object.assign(new Error('Não autenticado'), { status: 401 });

@@ -1,42 +1,26 @@
+import { ensureAuthReady, verifyToken, sanitizeUser } from '../../server/auth/index.js';
+import { findById } from '../../server/auth/userStore.js';
+import { getBearerToken, sendJson, handleError } from '../../server/vercelHttp.js';
+
+export { config } from '../../server/vercelHttp.js';
+
 export default async function meHandler(req, res) {
-  res.setHeader('Content-Type', 'application/json');
-
   if (req.method !== 'GET') {
-    res.statusCode = 405;
-    return res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return sendJson(res, 405, { error: 'Method not allowed' });
   }
-
   try {
-    const { ensureAuthReady, verifyToken, sanitizeUser } = await import('../../server/auth/index.js');
-    const { findById } = await import('../../server/auth/userStore.js');
-    const { getBearerToken } = await import('../../server/vercelHttp.js');
-
     await ensureAuthReady();
     const token = getBearerToken(req);
-    if (!token) {
-      res.statusCode = 401;
-      return res.end(JSON.stringify({ error: 'Não autenticado' }));
-    }
+    if (!token) return sendJson(res, 401, { error: 'Não autenticado' });
 
     const payload = verifyToken(token);
-    if (!payload) {
-      res.statusCode = 401;
-      return res.end(JSON.stringify({ error: 'Sessão expirada' }));
-    }
+    if (!payload) return sendJson(res, 401, { error: 'Sessão expirada' });
 
     const user = sanitizeUser(await findById(payload.sub));
-    if (!user) {
-      res.statusCode = 401;
-      return res.end(JSON.stringify({ error: 'Utilizador não encontrado' }));
-    }
+    if (!user) return sendJson(res, 401, { error: 'Utilizador não encontrado' });
 
-    res.statusCode = 200;
-    res.end(JSON.stringify({ user }));
+    return sendJson(res, 200, { user });
   } catch (err) {
-    console.error('[vercel] me error:', err);
-    res.statusCode = 500;
-    res.end(JSON.stringify({ error: err.message || 'Erro interno' }));
+    handleError(res, err);
   }
 }
-
-export const config = { maxDuration: 10 };
