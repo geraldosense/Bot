@@ -12,7 +12,9 @@ export default function SenseBotLogo({
       src="/logo-sense-bot-transparent.png"
       alt={alt}
       draggable={false}
-      className={`block object-contain object-center select-none bg-transparent ${className}`}
+      className={`block object-contain select-none bg-transparent ${
+        align === 'start' ? 'object-left' : 'object-center mx-auto'
+      } ${className}`}
       style={{
         filter: isHeader
           ? 'drop-shadow(0 2px 10px rgba(99, 102, 241, 0.4))'
