@@ -10,8 +10,7 @@ import BottomNav from '../components/BottomNav';
 import SenseBotLogo from '../components/SenseBotLogo';
 import GameCard from '../components/GameCard';
 import DailyScoreboardPanel from '../components/DailyScoreboardPanel';
-import VipLockedPanel, { VipStatusBanner } from '../components/VipLockedPanel';
-import WhatsAppGroupCard from '../components/WhatsAppGroupCard';
+import MemberDashboard from '../components/MemberDashboard';
 import { useAuth } from '../context/AuthContext';
 import { normalizeScoreboard, formatWinRate } from '../utils/scoreboard';
 
@@ -63,9 +62,17 @@ const GAMES = [
 
 const CATEGORIES = ['all', 'Cartas', 'Crash', 'Roleta'];
 
-const PLACEHOLDER_SCORE = normalizeScoreboard();
-
 export default function Dashboard() {
+  const { user, isVip } = useAuth();
+
+  if (!isVip) {
+    return <MemberDashboard user={user} />;
+  }
+
+  return <VipDashboard />;
+}
+
+function VipDashboard() {
   const navigate = useNavigate();
   const { alert, dismiss, handlePlayResult, handleHistory, handleSnapshot } = useResultAlerts();
   const { connected, snapshot, refreshHistory } = useWebSocket({
@@ -73,32 +80,31 @@ export default function Dashboard() {
     onHistory: handleHistory,
     onSnapshot: handleSnapshot,
   });
-  const { user, isVip } = useAuth();
   const [selectedGame, setSelectedGame] = React.useState(GAMES[0]);
   const [category, setCategory] = React.useState('all');
   const [tab, setTab] = React.useState('sinais');
 
   useEffect(() => {
-    if (!connected || !isVip) return undefined;
+    if (!connected) return undefined;
     if (tab !== 'sinais' && tab !== 'historico') return undefined;
     refreshHistory();
     const timer = setInterval(refreshHistory, 5000);
     return () => clearInterval(timer);
-  }, [connected, isVip, tab, refreshHistory]);
+  }, [connected, tab, refreshHistory]);
 
   const handleGameSelect = (game) => {
     if (game.disabled) return;
     setSelectedGame(game);
     if (game.type === 'bacbo' && game.path) {
-      if (isVip) navigate(game.path);
+      navigate(game.path);
     }
   };
 
   const isLiveGame = selectedGame.type === 'bacbo' && !selectedGame.disabled;
 
   const displayScoreboard = useMemo(
-    () => (isLiveGame && isVip ? snapshot.scoreboard : PLACEHOLDER_SCORE),
-    [isLiveGame, isVip, snapshot.scoreboard],
+    () => (isLiveGame ? snapshot.scoreboard : normalizeScoreboard()),
+    [isLiveGame, snapshot.scoreboard],
   );
 
   const maxGales = snapshot.rawSignal?.gales ?? snapshot.signal?.gales ?? 3;
@@ -111,7 +117,6 @@ export default function Dashboard() {
     <div className="min-h-screen bg-zinc-950 pb-28">
       <SignalResultAlert alert={alert} onDismiss={dismiss} />
 
-      {/* Header */}
       <div
         className="relative overflow-hidden py-5 px-4 shadow-xl border-b border-purple-500/20"
         style={{
@@ -126,39 +131,27 @@ export default function Dashboard() {
           <div className="flex items-center gap-3">
             <div
               className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
-                isVip && connected
+                connected
                   ? 'bg-green-500/20 text-green-300 border border-green-500/40'
                   : 'bg-zinc-700/40 text-zinc-400 border border-zinc-600/40'
               }`}
             >
-              {isVip && connected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-              {isVip && connected ? 'Online' : isVip ? 'Offline' : 'Sem VIP'}
+              {connected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+              {connected ? 'Online' : 'Offline'}
             </div>
           </div>
         </div>
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-4 space-y-4">
-        {!isVip && <VipStatusBanner user={user} />}
-        {!isVip && (
-          <WhatsAppGroupCard
-            compact
-            showHint={false}
-            title="Grupo WhatsApp oficial"
-            description="Suporte, avisos e pedido de acesso VIP."
-            buttonLabel="Entrar no grupo WhatsApp"
-          />
-        )}
-
         <DailyScoreboardPanel
           scoreboard={displayScoreboard}
           gameName={selectedGame.name}
-          live={isLiveGame && isVip && connected && snapshot.casinoConnected}
+          live={isLiveGame && connected && snapshot.casinoConnected}
           maxGales={maxGales}
-          disabled={!isLiveGame || !isVip}
+          disabled={!isLiveGame}
         />
 
-        {/* Game selector */}
         <div>
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
             {CATEGORIES.map((cat) => (
@@ -183,7 +176,7 @@ export default function Dashboard() {
                 game={game}
                 selected={selectedGame.id === game.id}
                 onSelect={handleGameSelect}
-                opensRobot={game.type === 'bacbo' && !game.disabled && isVip}
+                opensRobot={game.type === 'bacbo' && !game.disabled}
                 liveAssertivity={
                   game.type === 'bacbo' && displayScoreboard.meetsTarget
                     ? formatWinRate(displayScoreboard.winRate)
@@ -194,7 +187,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Tabs */}
         <div className="flex gap-2 bg-zinc-900/50 p-1 rounded-xl">
           {['sinais', 'catalogador', 'historico'].map((t) => (
             <button
@@ -211,10 +203,7 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Tab Sinais — só histórico + botão para o robô completo */}
-        {tab === 'sinais' && isLiveGame && !isVip && <VipLockedPanel />}
-
-        {tab === 'sinais' && isLiveGame && isVip && (
+        {tab === 'sinais' && isLiveGame && (
           <div className="space-y-4">
             <SignalHistory
               history={snapshot.history}
@@ -249,9 +238,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {tab === 'catalogador' && isLiveGame && !isVip && <VipLockedPanel title="Catalogador ao vivo" />}
-
-        {tab === 'catalogador' && isLiveGame && isVip && (
+        {tab === 'catalogador' && isLiveGame && (
           <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
             <HistoryGrid rounds={snapshot.rounds} />
           </div>
@@ -263,9 +250,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {tab === 'historico' && isLiveGame && !isVip && <VipLockedPanel title="Histórico de sinais" />}
-
-        {tab === 'historico' && isLiveGame && isVip && (
+        {tab === 'historico' && isLiveGame && (
           <div className="space-y-4">
             <SignalHistory
               history={snapshot.history}

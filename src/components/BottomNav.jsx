@@ -90,7 +90,12 @@ export default function BottomNav() {
   if (!user) return null;
 
   const tabs = [
-    { path: '/Dashboard', icon: Dice5, label: 'Sinais', accent: 'emerald' },
+    {
+      path: '/Dashboard',
+      icon: Dice5,
+      label: isVip ? 'Sinais' : 'Início',
+      accent: 'emerald',
+    },
     { path: '/Support', icon: MessageCircle, label: 'Suporte', accent: 'emerald' },
     {
       path: '/Profile',
