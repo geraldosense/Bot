@@ -19,7 +19,7 @@ export default function BacBo() {
   useEffect(() => {
     if (!connected) return;
     refreshHistory();
-    const timer = setInterval(refreshHistory, 15000);
+    const timer = setInterval(refreshHistory, 5000);
     return () => clearInterval(timer);
   }, [connected, refreshHistory]);
 

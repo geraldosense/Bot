@@ -53,15 +53,39 @@ export function attachLockedEntryBet(signal, contextSignals = []) {
     };
   }
 
+  const samePlay = contextSignals.find(
+    (s) =>
+      String(s.id) === String(signal.id) &&
+      ['confirmed', 'gale_update'].includes(s.signal_status),
+  );
+  if (samePlay) {
+    const bet = resolveEntryBet(samePlay);
+    if (bet) {
+      return {
+        ...signal,
+        entry_bet: bet,
+        bet,
+        bet_recommendation: samePlay.bet_recommendation || samePlay.bet_safe || bet,
+      };
+    }
+  }
+
   const createdMs = new Date(signal.created_date || signal.criado_em || 0).getTime();
   if (!Number.isFinite(createdMs)) return signal;
 
-  const priorEntry = contextSignals.find((s) => {
-    if (!['confirmed', 'gale_update'].includes(s.signal_status)) return false;
+  let priorEntry = null;
+  let bestMs = -Infinity;
+
+  for (const s of contextSignals) {
+    if (!['confirmed', 'gale_update'].includes(s.signal_status)) continue;
     const ms = new Date(s.created_date || s.criado_em || 0).getTime();
-    if (ms >= createdMs) return false;
-    return Boolean(s.bet_recommendation || s.bet_safe || s.entry_bet || s.bet);
-  });
+    if (ms >= createdMs) continue;
+    if (!s.bet_recommendation && !s.bet_safe && !s.entry_bet && !s.bet) continue;
+    if (ms > bestMs) {
+      bestMs = ms;
+      priorEntry = s;
+    }
+  }
 
   if (!priorEntry) return signal;
 

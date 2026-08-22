@@ -82,7 +82,7 @@ export default function Dashboard() {
     if (!connected || !isVip) return undefined;
     if (tab !== 'sinais' && tab !== 'historico') return undefined;
     refreshHistory();
-    const timer = setInterval(refreshHistory, 15000);
+    const timer = setInterval(refreshHistory, 5000);
     return () => clearInterval(timer);
   }, [connected, isVip, tab, refreshHistory]);
 

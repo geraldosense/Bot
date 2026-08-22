@@ -123,7 +123,7 @@ export async function fetchTodayHistoryBundle(gameId = GAME_ID) {
         `${base}&signal_status=eq.result&order=criado_em.desc&select=${SINAL_RESULT_SELECT}`,
       ),
       fetchAllSupabaseRows(
-        `${base}&signal_status=in.(result,confirmed)&order=criado_em.desc&select=${SINAL_CONTEXT_SELECT}`,
+        `${base}&signal_status=in.(result,confirmed,gale_update)&order=criado_em.desc&select=${SINAL_CONTEXT_SELECT}`,
         { pageSize: 300 },
       ),
     ]);
@@ -321,7 +321,11 @@ export class CasinoDataProvider {
     }
 
     // Placar ANTES do sinal — evita flash de valores parciais (2/1/67)
-    this.onSyncScoreboard?.({ casinoScoreboard: scoreboard, todayResults });
+    this.onSyncScoreboard?.({
+      casinoScoreboard: scoreboard,
+      todayResults: historyBundle.results,
+      historyContext: historyBundle.context,
+    });
 
     if (signal && signal.id !== this.lastSignalId) {
       this.lastSignalId = signal.id;

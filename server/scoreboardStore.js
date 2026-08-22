@@ -10,6 +10,7 @@ import {
 } from './playResult.js';
 import { resolveEntryBet, reconcileSignalResult } from './signalBet.js';
 import { senseSpotStore } from './senseSpotStore.js';
+import { prepareRobotHistorySignal } from './historyUtils.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, 'data');
@@ -243,6 +244,29 @@ export class ScoreboardStore {
     bucket.plays.sort((a, b) => new Date(a.at) - new Date(b.at));
     this.persist();
     return bucket.plays;
+  }
+
+  /** Grava todas as entradas finalizadas do robô (sync casino → SenseSpot) */
+  ingestRobotResults(signals = [], context = []) {
+    const fullContext = [...context, ...signals];
+    const beforeKey = this.getPlays()
+      .map((p) => `${p.id}|${p.result}|${p.entry_bet}|${p.at}`)
+      .join(',');
+
+    for (const raw of signals) {
+      const prepared = prepareRobotHistorySignal(raw, fullContext);
+      if (!prepared) continue;
+      this.recordPlay({ ...prepared, signal_status: 'result' });
+    }
+
+    const afterKey = this.getPlays()
+      .map((p) => `${p.id}|${p.result}|${p.entry_bet}|${p.at}`)
+      .join(',');
+
+    return {
+      changed: beforeKey !== afterKey,
+      total: this.getPlays().length,
+    };
   }
 
   /** Remove entradas importadas do feed externo (histórico errado) */

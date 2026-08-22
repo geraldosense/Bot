@@ -73,17 +73,28 @@ export class SignalEngine {
     return 'idle';
   }
 
-  /** Placar externo + histórico SenseSpot (não reimporta feed casino em massa) */
-  syncScoreboardData({ casinoScoreboard, todayResults = [] }) {
-    if (todayResults.length) {
-      this.liveContext = todayResults.slice(-200);
+  /** Placar externo + ingestão completa das entradas do robô (a cada sync) */
+  syncScoreboardData({ casinoScoreboard, todayResults = [], historyContext = [] }) {
+    if (todayResults.length || historyContext.length) {
+      this.liveContext = [...historyContext, ...todayResults].slice(-400);
     }
+
+    let ingested = { changed: false, total: scoreboardStore.getPlays().length };
+    if (todayResults.length) {
+      ingested = scoreboardStore.ingestRobotResults(todayResults, this.liveContext);
+    }
+
+    const prevCount = this.signalHistory.length;
     this.rebuildDayHistory();
+
     if (casinoScoreboard) {
       scoreboardStore.syncCasinoTotals(casinoScoreboard);
     }
     this.emitScoreboard();
-    this.emitHistory();
+
+    if (ingested.changed || this.signalHistory.length !== prevCount) {
+      this.emitHistory();
+    }
   }
 
   playToHistorySignal(play) {
@@ -112,11 +123,13 @@ export class SignalEngine {
     return isRobotHistorySignal(raw);
   }
 
-  /** Reconstrói histórico do dia — SenseSpot (base própria) + sessão live */
+  /** Reconstrói histórico do dia — SenseSpot + feed do robô (completo) */
   rebuildDayHistory() {
-    const context = [...this.liveContext, ...this.signalHistory];
+    const context = this.liveContext;
+    const liveResults = context.filter((s) => isRobotHistorySignal(s));
     const candidates = [
       ...scoreboardStore.getPlays().map((p) => this.playToHistorySignal(p)),
+      ...liveResults,
       ...this.signalHistory,
     ];
 
@@ -253,12 +266,11 @@ export class SignalEngine {
 
     if (signal.signal_status === 'result') {
       scoreboardStore.recordPlay(this.currentSignal);
+      this.rebuildDayHistory();
 
       const prevKey = this.signalHistory.map((s) => String(s.id)).join('|');
-      this.upsertHistorySignal(this.currentSignal);
-      const nextKey = this.signalHistory.map((s) => String(s.id)).join('|');
 
-      if (prevStatus !== 'result' || prevKey !== nextKey) {
+      if (prevStatus !== 'result' || prevKey !== this.signalHistory.map((s) => String(s.id)).join('|')) {
         this.emitHistory();
 
         if (prevStatus !== 'result') {
