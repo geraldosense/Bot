@@ -126,6 +126,7 @@ export async function initUserStore() {
 }
 
 async function migrateFileUsersToSupabase() {
+  if (process.env.VERCEL) return;
   try {
     const existing = await sbListUsers();
     if (existing.length > 0) return;

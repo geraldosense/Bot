@@ -7,6 +7,7 @@ import { CasinoDataProvider } from './casinoDataProvider.js';
 import { senseSpotStore } from './senseSpotStore.js';
 import {
   initAuth,
+  ensureAuthReady,
   registerAuthRoutes,
   registerAdminRoutes,
   authMiddleware,
@@ -59,7 +60,19 @@ export async function createApp(options = {}) {
     onSyncScoreboard: (data) => engine.syncScoreboardData(data),
   });
 
-  await initAuth();
+  if (vercel) {
+    app.use(async (req, res, next) => {
+      try {
+        await ensureAuthReady();
+        next();
+      } catch (err) {
+        next(err);
+      }
+    });
+  } else {
+    await initAuth();
+  }
+
   registerAuthRoutes(app);
   registerAdminRoutes(app, activeSessions);
 

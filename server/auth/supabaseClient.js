@@ -40,7 +40,7 @@ export async function pingUsersTable() {
     return { ok: false, reason: 'invalid_key', detail: 'Use service_role, not publishable/anon' };
   }
 
-  const timeoutMs = process.env.VERCEL ? 4000 : 10000;
+  const timeoutMs = process.env.VERCEL ? 2500 : 10000;
 
   try {
     const res = await fetch(

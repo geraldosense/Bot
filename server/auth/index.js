@@ -36,9 +36,15 @@ import { isManagerOrAbove } from './roleHierarchy.js';
 const JWT_SECRET = process.env.JWT_SECRET || 'bac-bo-bot-secret-change-in-production';
 const JWT_EXPIRES = '7d';
 let adminSeeded = false;
+let storeInitPromise = null;
+
+export function ensureAuthReady() {
+  if (!storeInitPromise) storeInitPromise = initUserStore();
+  return storeInitPromise;
+}
 
 export async function initAuth() {
-  await initUserStore();
+  await ensureAuthReady();
   if (!process.env.VERCEL) {
     await seedSuperAdmin();
     adminSeeded = true;
