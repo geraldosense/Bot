@@ -63,8 +63,20 @@ export async function createApp(options = {}) {
   registerAuthRoutes(app);
   registerAdminRoutes(app, activeSessions);
 
+  let vercelDataReady = null;
+  function ensureVercelDataReady() {
+    if (!vercelDataReady) {
+      vercelDataReady = (async () => {
+        await senseSpotStore.init();
+        await engine.bootstrapHistory();
+      })();
+    }
+    return vercelDataReady;
+  }
+
   const syncBeforeVipData = async (_req, _res, next) => {
     try {
+      if (vercel) await ensureVercelDataReady();
       await syncCasinoData(casino);
       next();
     } catch (err) {
@@ -123,7 +135,6 @@ export async function createApp(options = {}) {
   }
 
   app.get('/api/health', async (_, res) => {
-    if (vercel) await syncCasinoData(casino).catch(() => {});
     res.json({
       status: 'ok',
       platform: vercel ? 'vercel' : 'node',
@@ -175,11 +186,9 @@ export async function createApp(options = {}) {
     });
   }
 
-  await senseSpotStore.init();
-  await engine.bootstrapHistory();
-
-  if (vercel) {
-    await syncCasinoData(casino);
+  if (!vercel) {
+    await senseSpotStore.init();
+    await engine.bootstrapHistory();
   }
 
   const runtime = {
