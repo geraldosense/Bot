@@ -92,9 +92,9 @@ export default function Auth() {
         animate={{ opacity: 1, y: 0 }}
         className="relative z-10 w-full max-w-sm space-y-5 rounded-2xl border border-zinc-800/50 bg-zinc-950/40 backdrop-blur-sm px-5 py-6 shadow-[0_8px_32px_rgba(0,0,0,0.35)]"
       >
-        <div className="text-center">
-          <SenseBotLogo className="h-32 w-32 sm:h-36 sm:w-36" />
-          <p className="text-zinc-400 text-sm mt-2">Bem-vindo ao Sense Bot</p>
+        <div className="flex flex-col items-center text-center pt-1 pb-2">
+          <SenseBotLogo className="h-28 w-28 sm:h-32 sm:w-32" />
+          <p className="text-zinc-400 text-sm mt-3">Bem-vindo ao Sense Bot</p>
         </div>
 
         {/* Tabs Entrar / Registrar */}

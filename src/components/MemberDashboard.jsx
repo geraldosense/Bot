@@ -15,8 +15,9 @@ import {
   CheckCircle2,
   Clock,
 } from 'lucide-react';
-import SenseBotLogo from './SenseBotLogo';
+import SiteHeader from './SiteHeader';
 import BottomNav from './BottomNav';
+import WhatsAppGroupLink, { WHATSAPP_GROUP_NAME } from './WhatsAppGroupLink';
 import { VipStatusBanner } from './VipLockedPanel';
 
 const JOURNEY = [
@@ -29,8 +30,9 @@ const JOURNEY = [
   {
     id: 'request',
     title: 'Pedir acesso VIP',
-    desc: 'Solicita aprovação ao Proprietário para desbloquear os robôs dos casinos.',
+    desc: `Entra no grupo ${WHATSAPP_GROUP_NAME} e solicita aprovação ao Proprietário para desbloquear os robôs.`,
     done: false,
+    showWhatsApp: true,
   },
   {
     id: 'approve',
@@ -129,22 +131,15 @@ export default function MemberDashboard({ user }) {
 
   return (
     <div className="min-h-screen bg-zinc-950 pb-28">
-      {/* Header */}
-      <div
-        className="relative overflow-hidden py-5 px-4 border-b border-indigo-500/20"
-        style={{
-          background: 'linear-gradient(135deg, #312E81 0%, #4C1D95 50%, #1E1B4B 100%)',
-        }}
-      >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(255,255,255,0.08),transparent_50%)]" />
-        <div className="max-w-lg mx-auto flex items-center justify-between relative">
-          <SenseBotLogo variant="header" className="h-16 w-16 sm:h-20 sm:w-20" />
+      <SiteHeader
+        theme="member"
+        rightSlot={
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-zinc-900/50 text-zinc-300 border border-zinc-600/50">
             <Lock className="w-3 h-3" />
             Membro
           </span>
-        </div>
-      </div>
+        }
+      />
 
       <div className="max-w-lg mx-auto px-4 py-5 space-y-5">
         {/* Boas-vindas */}
@@ -213,9 +208,21 @@ export default function MemberDashboard({ user }) {
                     )}
                   </p>
                   <p className="text-zinc-500 text-xs mt-1 leading-relaxed">{step.desc}</p>
+                  {step.showWhatsApp && step.active && (
+                    <div className="mt-3">
+                      <WhatsAppGroupLink label="Abrir grupo WhatsApp" />
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-zinc-800/80">
+            <p className="text-zinc-500 text-[10px] text-center mb-2.5">
+              Comunidade oficial · pedidos VIP e avisos
+            </p>
+            <WhatsAppGroupLink />
           </div>
         </motion.section>
 

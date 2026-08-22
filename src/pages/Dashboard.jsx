@@ -7,10 +7,10 @@ import HistoryGrid from '../components/HistoryGrid';
 import SignalHistory from '../components/SignalHistory';
 import SignalResultAlert from '../components/SignalResultAlert';
 import BottomNav from '../components/BottomNav';
-import SenseBotLogo from '../components/SenseBotLogo';
 import GameCard from '../components/GameCard';
 import DailyScoreboardPanel from '../components/DailyScoreboardPanel';
 import MemberDashboard from '../components/MemberDashboard';
+import SiteHeader from '../components/SiteHeader';
 import { useAuth } from '../context/AuthContext';
 import { normalizeScoreboard, formatWinRate } from '../utils/scoreboard';
 
@@ -117,31 +117,21 @@ function VipDashboard() {
     <div className="min-h-screen bg-zinc-950 pb-28">
       <SignalResultAlert alert={alert} onDismiss={dismiss} />
 
-      <div
-        className="relative overflow-hidden py-5 px-4 shadow-xl border-b border-purple-500/20"
-        style={{
-          background: 'linear-gradient(135deg, #6366F1, #8B5CF6, #6366F1)',
-        }}
-      >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_50%,rgba(255,255,255,0.12),transparent_55%)]" />
-        <div className="max-w-4xl mx-auto flex items-center justify-between relative">
-          <div className="flex items-center">
-            <SenseBotLogo variant="header" className="h-20 w-20 sm:h-24 sm:w-24" />
+      <SiteHeader
+        theme="vip"
+        rightSlot={
+          <div
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
+              connected
+                ? 'bg-green-500/20 text-green-300 border border-green-500/40'
+                : 'bg-zinc-700/40 text-zinc-400 border border-zinc-600/40'
+            }`}
+          >
+            {connected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+            {connected ? 'Online' : 'Offline'}
           </div>
-          <div className="flex items-center gap-3">
-            <div
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
-                connected
-                  ? 'bg-green-500/20 text-green-300 border border-green-500/40'
-                  : 'bg-zinc-700/40 text-zinc-400 border border-zinc-600/40'
-              }`}
-            >
-              {connected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-              {connected ? 'Online' : 'Offline'}
-            </div>
-          </div>
-        </div>
-      </div>
+        }
+      />
 
       <div className="max-w-4xl mx-auto px-4 py-4 space-y-4">
         <DailyScoreboardPanel
