@@ -20,6 +20,10 @@ const SUPABASE_SERVICE_KEY = resolveServiceKey();
 
 const TABLE = 'sense_bot_users';
 
+function fetchTimeout(preferred = 10000) {
+  return process.env.VERCEL ? Math.min(preferred, 3500) : preferred;
+}
+
 function headers(extra = {}) {
   return {
     apikey: SUPABASE_SERVICE_KEY,
@@ -40,7 +44,7 @@ export async function pingUsersTable() {
     return { ok: false, reason: 'invalid_key', detail: 'Use service_role, not publishable/anon' };
   }
 
-  const timeoutMs = process.env.VERCEL ? 2500 : 10000;
+  const timeoutMs = fetchTimeout(2500);
 
   try {
     const res = await fetch(
@@ -103,7 +107,7 @@ function userToRow(user) {
 export async function sbListUsers() {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/${TABLE}?select=*&order=created_at.desc`,
-    { headers: headers(), signal: AbortSignal.timeout(15000) },
+    { headers: headers(), signal: AbortSignal.timeout(fetchTimeout(15000)) },
   );
   if (!res.ok) throw new Error(`Supabase list users: ${res.status}`);
   const rows = await res.json();
@@ -114,7 +118,7 @@ export async function sbFindByEmail(email) {
   const q = encodeURIComponent(email.toLowerCase());
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/${TABLE}?email=eq.${q}&select=*&limit=1`,
-    { headers: headers(), signal: AbortSignal.timeout(10000) },
+    { headers: headers(), signal: AbortSignal.timeout(fetchTimeout(10000)) },
   );
   if (!res.ok) throw new Error(`Supabase find email: ${res.status}`);
   const rows = await res.json();
@@ -124,7 +128,7 @@ export async function sbFindByEmail(email) {
 export async function sbFindById(id) {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}&select=*&limit=1`,
-    { headers: headers(), signal: AbortSignal.timeout(10000) },
+    { headers: headers(), signal: AbortSignal.timeout(fetchTimeout(10000)) },
   );
   if (!res.ok) throw new Error(`Supabase find id: ${res.status}`);
   const rows = await res.json();
@@ -136,7 +140,7 @@ export async function sbInsertUser(user) {
     method: 'POST',
     headers: headers({ Prefer: 'return=representation' }),
     body: JSON.stringify(userToRow(user)),
-    signal: AbortSignal.timeout(10000),
+    signal: AbortSignal.timeout(fetchTimeout(10000)),
   });
 
   if (res.status === 409) throw new Error('Email já registado');
@@ -168,7 +172,7 @@ export async function sbUpdateUser(id, patch) {
     method: 'PATCH',
     headers: headers({ Prefer: 'return=representation' }),
     body: JSON.stringify(rowPatch),
-    signal: AbortSignal.timeout(10000),
+    signal: AbortSignal.timeout(fetchTimeout(10000)),
   });
 
   if (!res.ok) {
@@ -191,7 +195,7 @@ export async function sbUpsertUsers(users) {
       Prefer: 'resolution=merge-duplicates,return=minimal',
     }),
     body: JSON.stringify(users.map(userToRow)),
-    signal: AbortSignal.timeout(30000),
+    signal: AbortSignal.timeout(fetchTimeout(30000)),
   });
 
   if (!res.ok) {

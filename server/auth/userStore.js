@@ -163,8 +163,10 @@ export async function seedSuperAdmin() {
     return sanitizeUser(await findById(existing.id));
   }
 
-  const anySuper = (await listUsers()).find((u) => u.role === ROLES.SUPER_ADMIN);
-  if (anySuper) return null;
+  if (!process.env.VERCEL) {
+    const anySuper = (await listUsers()).find((u) => u.role === ROLES.SUPER_ADMIN);
+    if (anySuper) return null;
+  }
 
   const user = {
     id: randomUUID(),

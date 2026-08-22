@@ -57,6 +57,8 @@ async function ensureAdminSeeded() {
   adminSeeded = true;
 }
 
+export { ensureAdminSeeded };
+
 export function signToken(user) {
   return jwt.sign({ sub: user.id, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
 }
