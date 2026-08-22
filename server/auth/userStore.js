@@ -27,7 +27,8 @@ import {
 export { ROLES, isAdminOrAbove, isVipOrAbove, hasPermission } from './roleHierarchy.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, '../data');
+const IS_VERCEL = !!process.env.VERCEL;
+const DATA_DIR = IS_VERCEL ? path.join('/tmp', 'sense-bot-data') : path.join(__dirname, '../data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 
 const DEFAULT_PERMISSIONS = {
@@ -41,9 +42,19 @@ let storageMode = 'file';
 let storeReady = false;
 
 function ensureFileStore() {
+  if (IS_VERCEL && storageMode === 'supabase') return;
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   if (!fs.existsSync(USERS_FILE)) {
     fs.writeFileSync(USERS_FILE, JSON.stringify({ users: [] }, null, 2));
+  }
+}
+
+function readFileUsersSafe() {
+  try {
+    if (!fs.existsSync(USERS_FILE)) return [];
+    return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8')).users || [];
+  } catch {
+    return [];
   }
 }
 
@@ -119,7 +130,7 @@ async function migrateFileUsersToSupabase() {
     const existing = await sbListUsers();
     if (existing.length > 0) return;
 
-    const fileUsers = readFileUsers();
+    const fileUsers = readFileUsersSafe();
     if (!fileUsers.length) return;
 
     await sbUpsertUsers(fileUsers);

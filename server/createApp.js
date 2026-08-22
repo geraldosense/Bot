@@ -2,8 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { createServer } from 'http';
-import { WebSocketServer } from 'ws';
 import { SignalEngine } from './signalEngine.js';
 import { CasinoDataProvider } from './casinoDataProvider.js';
 import { senseSpotStore } from './senseSpotStore.js';
@@ -78,6 +76,8 @@ export async function createApp(options = {}) {
   let wss = null;
 
   if (!vercel) {
+    const { createServer } = await import('http');
+    const { WebSocketServer } = await import('ws');
     httpServer = createServer(app);
     wss = new WebSocketServer({ server: httpServer });
 
