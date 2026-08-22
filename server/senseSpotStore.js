@@ -9,7 +9,8 @@ import { isSupabaseConfigured } from './auth/supabaseClient.js';
 import { todayKey, dayStartIso } from './dayKey.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, 'data');
+const IS_VERCEL = !!process.env.VERCEL;
+const DATA_DIR = IS_VERCEL ? path.join('/tmp', 'sense-bot-data') : path.join(__dirname, 'data');
 const FILE = path.join(DATA_DIR, 'sense-spot-plays.json');
 const TABLE = 'sense_spot_plays';
 

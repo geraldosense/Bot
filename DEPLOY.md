@@ -1,69 +1,88 @@
-# Publicar o Sense Bot na internet (qualquer telemóvel)
+# Publicar o Sense Bot na internet
 
-## Porque `seven.vercel.app` não funciona
+O Sense Bot pode correr na **Vercel** (recomendado) ou no **Render**. Ambos servem site + API num único URL.
 
-A **Vercel** só publica páginas estáticas. O Sense Bot precisa de:
+---
 
-- **API** (`/api/auth/login`, registo, admin…)
-- **WebSocket** (sinais da IA ao vivo)
-- **Servidor Node.js** sempre ligado
+## Vercel (recomendado)
 
-Por isso o login no telemóvel dava **404 NOT_FOUND** — a página abria, mas a API não existia na Vercel.
-
-## Solução: Render.com (grátis)
-
-Um único link público serve **tudo** (site + API + IA), como qualquer site normal.
+A Vercel serve o frontend estático e a API como funções serverless. Os sinais VIP usam **polling** (pedidos a cada 3 s) em vez de WebSocket — funciona igual para o utilizador.
 
 ### Passo a passo
 
-1. **GitHub** — garante que o código está em https://github.com/geraldosense/Bot (já está)
+1. **GitHub** — código em https://github.com/geraldosense/Bot
 
-2. **Render** — entra em https://render.com e regista-te (podes usar conta GitHub)
+2. **Vercel** — https://vercel.com → **Add New → Project** → importa o repo `geraldosense/Bot`
 
-3. **New → Blueprint** — escolhe o repositório `geraldosense/Bot`
-   - O Render lê o ficheiro `render.yaml` automaticamente
-   - Clica **Apply**
+3. **Configuração** (a Vercel lê `vercel.json` automaticamente):
+   - Framework: **Other**
+   - Build: `npm run build`
+   - Output: `dist`
 
-4. **Variáveis de ambiente** (Render → sense-bot → Environment):
+4. **Variáveis de ambiente** (Settings → Environment Variables):
 
    | Variável | Valor |
    |----------|--------|
+   | `JWT_SECRET` | string longa aleatória |
    | `SUPER_ADMIN_EMAIL` | teu email |
    | `SUPER_ADMIN_PASSWORD` | password segura |
-   | `SUPABASE_URL` | `https://btyescbddoopbbuacyhd.supabase.co` |
-   | `SUPABASE_SERVICE_ROLE_KEY` | chave **service_role** do Supabase (Settings → API) |
+   | `SUPABASE_URL` | URL do Supabase |
+   | `SUPABASE_SERVICE_ROLE_KEY` | chave **service_role** |
+   | `CASINO_SUPABASE_URL` | URL Supabase do casino |
+   | `SUPABASE_KEY` | chave do casino (se diferente) |
+   | `VITE_SIGNAL_MODE` | `poll` |
 
-5. **Criar tabela de contas** (uma vez só):
-   - Supabase Dashboard → **SQL Editor** → New query
-   - Copia o conteúdo de `supabase/sense_bot_users.sql` e clica **Run**
+5. **SQL no Supabase** (uma vez):
+   - `supabase/sense_bot_users.sql` — contas
+   - `supabase/sense_spot_plays.sql` — histórico SenseSpot
 
-6. **Deploy** — Manual sync no Render
-   ```
-   https://sense-bot-xxxx.onrender.com
-   ```
+6. **Deploy** — cada push para `main` faz deploy automático.
 
-6. **Partilha no WhatsApp** — envia esse link. Funciona em **qualquer telemóvel** com internet.
+URL exemplo: `https://sense-bot.vercel.app`
 
-### Domínio personalizado (opcional)
+### Notas Vercel
 
-No Render: **Settings → Custom Domain** → podes ligar `sensebot.pt` ou similar.
+- **Sem suspensão por tráfego externo** como no Render Free
+- Plano Hobby grátis — limites de invocações serverless são generosos para este uso
+- Histórico persistente fica no **Supabase** (`sense_spot_plays`), não no disco do servidor
+- Admin → “utilizadores IA activos” depende de WebSocket no Render; na Vercel usa presença via login
 
-### Contas persistentes
+---
 
-As contas ficam guardadas na **base de dados Supabase** (`sense_bot_users`), não num ficheiro temporário. Assim, reinícios do Render **não apagam** utilizadores registados.
+## Render (alternativa)
 
-Verificar ligação localmente: `npm run db:check`
+Servidor Node.js sempre ligado + WebSocket em tempo real.
 
-### Nota sobre o plano grátis Render
+Ver `render.yaml` e https://dashboard.render.com
 
-## Alternativa local (só mesma Wi‑Fi)
+**Atenção:** plano Free pode suspender por horas esgotadas ou tráfego externo (polling casino a cada 3 s).
+
+---
+
+## Local (desenvolvimento)
+
+```bash
+npm install
+npm run dev
+```
+
+Frontend: http://localhost:5173  
+API + WebSocket: http://localhost:3001
+
+---
+
+## Mesma Wi‑Fi (sem cloud)
 
 ```bash
 npm run go-live
 ```
 
-Partilha `http://SEU_IP_LOCAL:3001/login` (ex: `http://192.168.8.152:3001/login`) — **não** uses `localhost` no WhatsApp.
+Partilha `http://SEU_IP:3001/login` — não uses `localhost` no WhatsApp.
 
-## Desactivar a Vercel
+---
 
-Remove ou pausa o projecto `seven.vercel.app` no dashboard Vercel para evitar confusão. Usa só o URL do Render.
+## Verificar base de dados
+
+```bash
+npm run db:check
+```

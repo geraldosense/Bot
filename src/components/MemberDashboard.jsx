@@ -63,7 +63,7 @@ const HIGHLIGHTS = [
   {
     icon: Radio,
     title: 'Conexão ao vivo',
-    desc: 'WebSocket VIP — recebes sinais no exacto momento em que a IA confirma.',
+    desc: 'Sinais VIP em tempo real — recebes entradas assim que a IA confirma.',
   },
   {
     icon: Shield,

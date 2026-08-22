@@ -4,6 +4,7 @@ import { normalizeScoreboard } from '../utils/scoreboard';
 import { normalizeHistoryList } from '../utils/historyNormalize';
 
 const GAME_ID = 'bac_bo';
+const USE_POLLING = import.meta.env.VITE_SIGNAL_MODE === 'poll';
 
 function getWsUrl(token) {
   const host = import.meta.env.DEV ? `${window.location.hostname}:3001` : window.location.host;
@@ -92,6 +93,38 @@ export function useWebSocket(options = {}) {
       .catch(() => {});
   }, [token, isVip, applyScoreboard, patchSnapshot]);
 
+  const applySnapshot = useCallback(
+    (data) => {
+      setSnapshot((prev) => ({
+        ...data,
+        signal: data.monitoring ? null : data.signal,
+        history: normalizeHistoryList(data.history || []),
+        scoreboard: applyScoreboard(data.scoreboard),
+        gameId: GAME_ID,
+      }));
+      onSnapshotRef.current?.(data);
+    },
+    [applyScoreboard],
+  );
+
+  const pollSnapshot = useCallback(async () => {
+    if (!token || !isVip) return;
+    try {
+      const res = await fetch('/api/snapshot', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        setConnected(false);
+        return;
+      }
+      const data = await res.json();
+      setConnected(true);
+      applySnapshot(data);
+    } catch {
+      setConnected(false);
+    }
+  }, [token, isVip, applySnapshot]);
+
   const connect = useCallback(() => {
     if (!token || !isVip) return;
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -122,14 +155,7 @@ export function useWebSocket(options = {}) {
 
         switch (msg.type) {
           case 'snapshot':
-            setSnapshot((prev) => ({
-              ...msg.data,
-              signal: msg.data.monitoring ? null : msg.data.signal,
-              history: normalizeHistoryList(msg.data.history || []),
-              scoreboard: applyScoreboard(msg.data.scoreboard),
-              gameId: GAME_ID,
-            }));
-            onSnapshotRef.current?.(msg.data);
+            applySnapshot(msg.data);
             break;
           case 'state':
             setSnapshot((prev) => ({
@@ -188,7 +214,7 @@ export function useWebSocket(options = {}) {
         /* ignore */
       }
     };
-  }, [token, isVip, patchSnapshot, applyScoreboard]);
+  }, [token, isVip, patchSnapshot, applyScoreboard, applySnapshot]);
 
   useEffect(() => {
     if (!token || !isVip) {
@@ -196,6 +222,13 @@ export function useWebSocket(options = {}) {
       setConnected(false);
       return;
     }
+
+    if (USE_POLLING) {
+      pollSnapshot();
+      const timer = setInterval(pollSnapshot, 3000);
+      return () => clearInterval(timer);
+    }
+
     connect();
     const ping = setInterval(() => {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -207,7 +240,7 @@ export function useWebSocket(options = {}) {
       if (reconnectRef.current) clearTimeout(reconnectRef.current);
       wsRef.current?.close();
     };
-  }, [connect, token, isVip]);
+  }, [connect, pollSnapshot, token, isVip]);
 
   const send = useCallback((data) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -215,7 +248,25 @@ export function useWebSocket(options = {}) {
     }
   }, []);
 
-  const forceAnalyze = useCallback(() => send({ type: 'force_analyze' }), [send]);
+  const forceAnalyze = useCallback(async () => {
+    if (USE_POLLING) {
+      if (!token || !isVip) return;
+      try {
+        const res = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.snapshot) applySnapshot(data.snapshot);
+        }
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+    send({ type: 'force_analyze' });
+  }, [send, token, isVip, applySnapshot]);
 
   const refreshHistory = useCallback(async () => {
     if (!token || !isVip) return;
