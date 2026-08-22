@@ -10,7 +10,7 @@
   "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }],
   "functions": {
     "api/[[...path]].js": {
-      "maxDuration": 30
+      "maxDuration": 10
     }
   }
 }

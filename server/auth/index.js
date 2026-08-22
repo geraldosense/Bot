@@ -35,10 +35,20 @@ import { isManagerOrAbove } from './roleHierarchy.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'bac-bo-bot-secret-change-in-production';
 const JWT_EXPIRES = '7d';
+let adminSeeded = false;
 
 export async function initAuth() {
   await initUserStore();
+  if (!process.env.VERCEL) {
+    await seedSuperAdmin();
+    adminSeeded = true;
+  }
+}
+
+async function ensureAdminSeeded() {
+  if (adminSeeded) return;
   await seedSuperAdmin();
+  adminSeeded = true;
 }
 
 export function signToken(user) {
@@ -115,6 +125,7 @@ export function requirePermission(permission) {
 export function registerAuthRoutes(app) {
   app.post('/api/auth/register', async (req, res) => {
     try {
+      await ensureAdminSeeded();
       const { email, password, name } = req.body;
       if (!email || !password || !name) {
         return res.status(400).json({ error: 'Email, nome e password são obrigatórios' });
@@ -138,6 +149,7 @@ export function registerAuthRoutes(app) {
 
   app.post('/api/auth/login', async (req, res) => {
     try {
+      await ensureAdminSeeded();
       const { email, password } = req.body;
       const raw = await findByEmail(email);
       if (!raw || !(await verifyPassword(raw, password))) {

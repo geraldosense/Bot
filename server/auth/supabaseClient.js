@@ -40,10 +40,12 @@ export async function pingUsersTable() {
     return { ok: false, reason: 'invalid_key', detail: 'Use service_role, not publishable/anon' };
   }
 
+  const timeoutMs = process.env.VERCEL ? 4000 : 10000;
+
   try {
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/${TABLE}?select=id&limit=1`,
-      { headers: headers(), signal: AbortSignal.timeout(10000) },
+      { headers: headers(), signal: AbortSignal.timeout(timeoutMs) },
     );
 
     if (res.status === 404 || res.status === 406) {
