@@ -28,8 +28,14 @@ export default function Auth() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+      <div
+        className="relative min-h-screen bg-zinc-950 flex items-center justify-center overflow-hidden"
+        style={{
+          background: 'radial-gradient(ellipse at 50% 0%, #0B3D1A 0%, #050505 60%, #000 100%)',
+        }}
+      >
+        <MoneyRain />
+        <div className="relative z-10 w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -84,7 +90,7 @@ export default function Auth() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative z-10 w-full max-w-sm space-y-5 rounded-2xl border border-zinc-800/60 bg-zinc-950/55 backdrop-blur-md px-5 py-6 shadow-[0_8px_32px_rgba(0,0,0,0.45)]"
+        className="relative z-10 w-full max-w-sm space-y-5 rounded-2xl border border-zinc-800/50 bg-zinc-950/40 backdrop-blur-sm px-5 py-6 shadow-[0_8px_32px_rgba(0,0,0,0.35)]"
       >
         <div className="text-center">
           <SenseBotLogo className="h-32 w-32 sm:h-36 sm:w-36" />

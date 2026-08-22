@@ -1,29 +1,31 @@
 import { useMemo } from 'react';
+import { motion } from 'framer-motion';
 
-const COUNT = 22;
+const COUNT = 36;
 
 function Bill({ size, uid }) {
-  const gradId = `billGrad-${uid}`;
+  const gradId = `bill-${uid}`;
   return (
     <svg
       width={size}
-      height={size * 0.55}
-      viewBox="0 0 48 26"
+      height={size * 0.52}
+      viewBox="0 0 56 29"
       fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className="drop-shadow-[0_2px_8px_rgba(16,185,129,0.35)]"
+      aria-hidden
+      className="select-none"
+      style={{ filter: 'drop-shadow(0 4px 12px rgba(250,204,21,0.45))' }}
     >
-      <rect x="0.5" y="0.5" width="47" height="25" rx="2.5" fill={`url(#${gradId})`} stroke="#34D399" strokeOpacity="0.5" />
-      <rect x="4" y="4" width="40" height="18" rx="1" stroke="#6EE7B7" strokeOpacity="0.25" strokeWidth="0.5" fill="none" />
-      <circle cx="24" cy="13" r="5" stroke="#A7F3D0" strokeOpacity="0.4" strokeWidth="0.75" fill="none" />
-      <text x="24" y="15.5" textAnchor="middle" fill="#ECFDF5" fontSize="7" fontWeight="700" opacity="0.85">
+      <rect width="56" height="29" rx="3" fill={`url(#${gradId})`} />
+      <rect x="3" y="3" width="50" height="23" rx="2" stroke="#FEF9C3" strokeOpacity="0.45" strokeWidth="0.75" fill="none" />
+      <circle cx="28" cy="14.5" r="6" stroke="#FEF08A" strokeOpacity="0.5" strokeWidth="0.75" fill="none" />
+      <text x="28" y="17.5" textAnchor="middle" fill="#422006" fontSize="9" fontWeight="800">
         $
       </text>
       <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="48" y2="26" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#065F46" />
-          <stop offset="0.5" stopColor="#059669" />
-          <stop offset="1" stopColor="#047857" />
+        <linearGradient id={gradId} x1="0" y1="0" x2="56" y2="29">
+          <stop stopColor="#FDE047" />
+          <stop offset="0.45" stopColor="#FACC15" />
+          <stop offset="1" stopColor="#EAB308" />
         </linearGradient>
       </defs>
     </svg>
@@ -31,27 +33,27 @@ function Bill({ size, uid }) {
 }
 
 function Coin({ size, uid }) {
-  const gradId = `coinGrad-${uid}`;
+  const gradId = `coin-${uid}`;
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 24 24"
+      viewBox="0 0 28 28"
       fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className="drop-shadow-[0_2px_10px_rgba(251,191,36,0.45)]"
+      aria-hidden
+      className="select-none"
+      style={{ filter: 'drop-shadow(0 4px 14px rgba(251,191,36,0.55))' }}
     >
-      <circle cx="12" cy="12" r="11" fill={`url(#${gradId})`} stroke="#FCD34D" strokeWidth="0.75" strokeOpacity="0.6" />
-      <circle cx="12" cy="12" r="7.5" stroke="#FDE68A" strokeOpacity="0.35" strokeWidth="0.5" fill="none" />
-      <text x="12" y="15" textAnchor="middle" fill="#78350F" fontSize="9" fontWeight="800">
+      <circle cx="14" cy="14" r="13" fill={`url(#${gradId})`} stroke="#FEF3C7" strokeWidth="1" />
+      <text x="14" y="18" textAnchor="middle" fill="#78350F" fontSize="11" fontWeight="900">
         $
       </text>
       <defs>
-        <linearGradient id={gradId} x1="4" y1="4" x2="20" y2="20" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#FBBF24" />
-          <stop offset="0.5" stopColor="#F59E0B" />
-          <stop offset="1" stopColor="#D97706" />
-        </linearGradient>
+        <radialGradient id={gradId} cx="40%" cy="35%" r="65%">
+          <stop stopColor="#FDE68A" />
+          <stop offset="0.55" stopColor="#F59E0B" />
+          <stop offset="1" stopColor="#B45309" />
+        </radialGradient>
       </defs>
     </svg>
   );
@@ -59,49 +61,74 @@ function Coin({ size, uid }) {
 
 function createItems(count) {
   return Array.from({ length: count }, (_, i) => {
-    const isCoin = i % 3 === 0;
+    const isCoin = i % 4 === 0;
     return {
       id: i,
       type: isCoin ? 'coin' : 'bill',
-      left: `${(i * 17 + 7) % 94}%`,
-      size: isCoin ? 18 + (i % 4) * 3 : 28 + (i % 5) * 4,
-      delay: `${(i * 0.65) % 8}s`,
-      duration: `${9 + (i % 6) * 1.4}s`,
-      opacity: 0.35 + (i % 4) * 0.12,
-      blur: i % 5 === 0 ? 1 : 0,
+      left: `${4 + ((i * 23) % 92)}%`,
+      size: isCoin ? 22 + (i % 3) * 6 : 38 + (i % 4) * 8,
+      delay: (i * 0.35) % 6,
+      duration: 7 + (i % 5) * 1.2,
+      drift: i % 2 === 0 ? 28 : -24,
+      startRotate: -25 + (i % 7) * 8,
+      endRotate: 15 + (i % 5) * 12,
+      layer: i % 3,
     };
   });
 }
 
-/** Chuva de dinheiro — fundo decorativo do login */
+function FallingItem({ item }) {
+  const scale = item.layer === 0 ? 1 : item.layer === 1 ? 0.85 : 0.7;
+  const baseOpacity = item.layer === 0 ? 0.95 : item.layer === 1 ? 0.75 : 0.55;
+
+  return (
+    <motion.div
+      className="absolute top-0"
+      style={{
+        left: item.left,
+        zIndex: item.layer,
+        scale,
+      }}
+      initial={{
+        y: '-8vh',
+        x: 0,
+        rotate: item.startRotate,
+        opacity: 0,
+      }}
+      animate={{
+        y: ['-8vh', '8vh', '55vh', '92vh', '108vh'],
+        x: [0, item.drift * 0.35, item.drift, item.drift * 0.5, item.drift * 0.2],
+        rotate: [item.startRotate, item.endRotate * 0.6, item.endRotate, item.startRotate * -0.3, item.endRotate * 0.8],
+        opacity: [0, baseOpacity, baseOpacity, baseOpacity * 0.85, 0],
+      }}
+      transition={{
+        duration: item.duration,
+        delay: item.delay,
+        repeat: Infinity,
+        ease: 'linear',
+        times: [0, 0.08, 0.75, 0.92, 1],
+      }}
+    >
+      {item.type === 'coin' ? (
+        <Coin size={item.size} uid={item.id} />
+      ) : (
+        <Bill size={item.size} uid={item.id} />
+      )}
+    </motion.div>
+  );
+}
+
+/** Chuva de dinheiro — fundo animado do login */
 export default function MoneyRain() {
   const items = useMemo(() => createItems(COUNT), []);
 
   return (
-    <div
-      className="fixed inset-0 overflow-hidden pointer-events-none z-0"
-      aria-hidden="true"
-    >
-      <div className="absolute inset-0 bg-gradient-to-b from-emerald-950/20 via-transparent to-black/40" />
+    <div className="fixed inset-0 overflow-hidden pointer-events-none z-[1]" aria-hidden="true">
+      {/* Vinheta suave — não tapa o dinheiro */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(0,0,0,0.35)_100%)]" />
 
       {items.map((item) => (
-        <div
-          key={item.id}
-          className="money-rain-particle absolute top-0 will-change-transform"
-          style={{
-            left: item.left,
-            animationDelay: item.delay,
-            animationDuration: item.duration,
-            opacity: item.opacity,
-            filter: item.blur ? `blur(${item.blur}px)` : undefined,
-          }}
-        >
-          {item.type === 'coin' ? (
-            <Coin size={item.size} uid={item.id} />
-          ) : (
-            <Bill size={item.size} uid={item.id} />
-          )}
-        </div>
+        <FallingItem key={item.id} item={item} />
       ))}
     </div>
   );
