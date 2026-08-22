@@ -5,6 +5,7 @@ import { LogIn, UserPlus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import SenseBotLogo from '../components/SenseBotLogo';
 import WhatsAppGroupCard from '../components/WhatsAppGroupCard';
+import MoneyRain from '../components/MoneyRain';
 
 export default function Auth() {
   const location = useLocation();
@@ -73,15 +74,17 @@ export default function Auth() {
 
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center px-6 py-12"
+      className="relative min-h-screen flex flex-col items-center justify-center px-6 py-12 overflow-hidden"
       style={{
         background: 'radial-gradient(ellipse at 50% 0%, #0B3D1A 0%, #050505 60%, #000 100%)',
       }}
     >
+      <MoneyRain />
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-sm space-y-5"
+        className="relative z-10 w-full max-w-sm space-y-5 rounded-2xl border border-zinc-800/60 bg-zinc-950/55 backdrop-blur-md px-5 py-6 shadow-[0_8px_32px_rgba(0,0,0,0.45)]"
       >
         <div className="text-center">
           <SenseBotLogo className="h-32 w-32 sm:h-36 sm:w-36" />

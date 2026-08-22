@@ -36,3 +36,40 @@ body {
 .animate-spin-slow {
   animation: spin 1s linear infinite;
 }
+
+@keyframes money-fall {
+  0% {
+    transform: translate3d(0, -12vh, 0) rotate(-18deg) scale(0.85);
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  22% {
+    transform: translate3d(14px, 22vh, 0) rotate(10deg) scale(1);
+  }
+  48% {
+    transform: translate3d(-10px, 48vh, 0) rotate(-8deg) scale(1);
+  }
+  72% {
+    transform: translate3d(12px, 72vh, 0) rotate(14deg) scale(0.98);
+  }
+  94% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translate3d(-8px, 112vh, 0) rotate(22deg) scale(0.9);
+    opacity: 0;
+  }
+}
+
+.money-rain-particle {
+  animation: money-fall linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .money-rain-particle {
+    animation: none;
+    opacity: 0.15 !important;
+  }
+}
